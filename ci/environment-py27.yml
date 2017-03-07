@@ -1,0 +1,14 @@
+name: test_env
+dependencies:
+  - python=2.7
+  - xarray
+  - dask
+  - numpy
+  - pytest
+  - future
+  - scipy
+  - pip:
+    - codecov
+    - pytest-cov
+    - xmitgcm
+    - "--editable=git+https://github.com/jbusecke/xarrayutils.git#egg=xarrayutils"
