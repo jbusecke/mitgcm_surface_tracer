@@ -7,7 +7,21 @@ This package should enable [MITgcm](http://mitgcm.org) users to design,execute a
 It is heavily under construction under the moment and not useable yet...
 
 
-<!-- ## Literature
+## Setting up the conda environment
+Using conda as package manager is recommended. Installation instructions can be found **MISSING LINK**
+module add anaconda/4.1.1-python-2.7.12
+
+The `tracer_processing_env.yml`
+can be used to install all dependencies as a python environment.
+```
+cd ~TBD~
+# Create the environment (this needs to be done only once)
+conda env create -f tracer_processing_env.yml
+
+#activate environment
+source activate tracer_processing
+```
+For more information on maintaining conda environments see https://conda.io/docs/using/envs.html
 
 
 
