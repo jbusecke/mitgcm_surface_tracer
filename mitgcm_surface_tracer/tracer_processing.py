@@ -142,13 +142,20 @@ class tracer_engine:
 
 def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
             low_gradient_perc=0.1,debug=False,method='LT'):
-    func        = np.sum #!!! with this i make all the masking pretty much
+    func        = np.nansum #!!! with this i make all the masking pretty much
     #obsolete but I had some crazy strong outliers around the small islands
     area        = snap.rA
+    landmask_c  = snap.hFacC!=0
+    landmask_s  = snap.hFacS!=0
+    landmask_w  = snap.hFacS!=0
+    landmask    = np.logical_or(np.logical_or(landmask_s,landmask_w),landmask_c)
     #### Masking ####
     valid_mask = xr.DataArray(readbin(validfile,area.shape)==0,\
                   dims=area.dims,coords=area.coords)
-    area        = area.where(snap.hFacC!=0).where(valid_mask)
+    # the area needs to be masked at every point where there would be missing
+    # values produced by the gradients...so all landmasks combined
+    area        = area.where(landmask).where(valid_mask)
+    # this is later multiplied with the values so it should take care of
     area_sum    = xut.aggregate(area,bins,func=func)
 
     # Ok this needs some thorough invesigation, but is probably of minor importance (e.g. only near the coast)
@@ -195,6 +202,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
                          = xut.xmitgcm_utils.gradient(grid_coarse,q_coarse,recenter=True)
         q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
         d                = q_coarse_grad_sq
+
     elif method == 'T':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
@@ -209,11 +217,13 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
         n                = xut.aggregate(n*area,bins,func=func)/area_sum
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_gradx,q_mean_grady  = xut.xmitgcm_utils.gradient(grid,q_mean,recenter=True)
+        q_mean_gradx,q_mean_grady \
+                         = xut.xmitgcm_utils.gradient(grid,q_mean,recenter=True)
         q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
         d                = xut.aggregate(d*area,bins,func=func)/area_sum
+
     elif method =='LT':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
