@@ -28,8 +28,15 @@ def paramReadout(directory):
     for dfile in ['data','data.ptracers','data.diagnostics']:
         for line in open(directory+dfile):
             if '&' not in line and '#' not in line and '\n' not in line[0]:
-                line_out = line.replace(',\n','').replace(' ','').split('=');
-                if len(line_out)==2:
+                line_out = (line.replace('\n','')
+                                .replace(' ','')
+                                .split('=')
+                                )
+                if len(line_out)==2 and len(line_out[1])>1:
+                    while line_out[1][-1] in ['.',',']:
+                        line_out[1] = line_out[1][0:-1]
+                        while line_out[1][-1] in ['.',',']:
+                            line_out[1] = line_out[1][0:-1]
                     params[dfile+'/'+line_out[0]] = line_out[1]
     return params
 
