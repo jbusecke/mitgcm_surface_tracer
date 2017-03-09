@@ -182,13 +182,13 @@ def reset_cut(reset_frq,reset_pha,total_time,dt_model,iters,tr_num,cut_time):
 
     #translate cut time to iters (round down)
     cut = np.ceil(cut_time/float(dt_model))
-    mask = np.zeros_like(iters)
+    mask = np.ones_like(iters)
     for ii in reset_iters:
-        if cut_time<1:
+        if cut_time<0:
             idx = np.logical_and(iters>(ii+cut),iters<=ii)
         else:
             idx = np.logical_and(iters>=ii,iters<(ii+cut))
-        mask[idx] = 1
+        mask[idx] = 0
     return mask,reset_iters,reset_time
 
 def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
