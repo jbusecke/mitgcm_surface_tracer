@@ -329,15 +329,15 @@ def main(ddir,initpath,odir,validmaskpath,
     TrCore = tracer_engine(ddir,initpath,koc_kappa=kappa,odir=odir,
                             validmaskpath=validmaskpath,
                             koc_interval=koc_interval,makedirs=True)
-    print("--- %s seconds ---" % (time.time() - start_time))
 
-    start_time = time.time()
     print('CALCULATE OSBORN-COX DIFFUSIVITY')
+    start_time = time.time()
     KOC,raw = TrCore.KOC_combined(spin_up_months=spin_up_time,iters=iters)
     print("--- %s seconds ---" % (time.time() - start_time))
 
-    start_time = time.time()
+
     print('SAVE TO FILE')
+    start_time = time.time()
     KOC.to_netcdf(TrCore.odir+'/'+'KOC_FINAL.nc')
     raw.to_netcdf(TrCore.odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))
