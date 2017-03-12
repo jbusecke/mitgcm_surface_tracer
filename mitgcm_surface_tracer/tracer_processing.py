@@ -89,7 +89,7 @@ class tracer_engine:
         delta_t=self.dt_model,ref_date=self.ref_date,iters=iters,swap_dims=False)
         return ds
 
-    def KOC(self,tr_num,directory=None,interval=None,low_grad_crit=0.05,\
+    def KOC(self,tr_num,directory=None,interval=None,\
             spin_up_months=3,iters='all',debug=False):
 
         if interval==None:
@@ -110,7 +110,7 @@ class tracer_engine:
 
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
         KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,self.initpath,tr_num,\
-                                bins,low_gradient_perc=low_grad_crit,\
+                                bins,\
                                 kappa=self.koc_kappa)
 
         val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
@@ -122,7 +122,7 @@ class tracer_engine:
 
         return ds,R
 
-    def KOC_combined(self,directory=None,interval=None,low_grad_crit=0.05,\
+    def KOC_combined(self,directory=None,interval=None,\
                     spin_up_months=3,iters='all',debug=False):
         """ Calculates the KOC results for all tracer
 
@@ -138,7 +138,6 @@ class tracer_engine:
             tr_str = '0'+str(tr+1)
             temp_ds,temp_R = self.KOC(tr_str,directory=directory,\
                                     spin_up_months=spin_up_months,\
-                                    low_grad_crit=low_grad_crit,\
                                     iters=iters,interval=interval,debug=debug)
             pre_combined_ds.append(temp_ds)
             pre_combined_R.append(temp_R)
@@ -192,7 +191,7 @@ def reset_cut(reset_frq,reset_pha,total_time,dt_model,iters,tr_num,cut_time):
     return mask,reset_iters,reset_time
 
 def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
-                low_gradient_perc=0.1,debug=False,method='LT'):
+                debug=False,method='LT'):
     func        = np.sum #!!! with this i make all the masking pretty much
     #obsolete but I had some crazy strong outliers around the small islands
     area        = snap.rA
@@ -294,16 +293,6 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     q_init_gradx,q_init_grady = xut.xmitgcm_utils.gradient(mean,q_init.where(valid_mask),recenter=True)
     q_init_grad_sq = q_init_gradx**2 + q_init_grady**2
 
-    #!!! this needs some work...
-    low_cut = q_init_grad_sq.data.flatten()
-    low_cut = low_cut[~np.isnan(low_cut)]
-    low_cut = np.percentile(low_cut,low_gradient_perc*100)
-
-
-
-    #mask out validmask and low gradient cut
-    d   = d.where(d>low_cut)
-
     # Final edits for output
     koc = n/d*kappa
 
@@ -324,7 +313,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     return koc,n,d,raw,raw_coarse
 
 def main(ddir,initpath,odir,validmaskpath,
-    koc_interval=20,kappa=63,iters='all',low_grad=0.05,spin_up_time = 3):
+    koc_interval=20,kappa=63,iters='all',spin_up_time = 3):
     # spin_up_time in months
 
     # default value for kappa=63
@@ -344,8 +333,7 @@ def main(ddir,initpath,odir,validmaskpath,
 
     start_time = time.time()
     print('CALCULATE OSBORN-COX DIFFUSIVITY')
-    KOC,raw = TrCore.KOC_combined(spin_up_months=spin_up_time,\
-                                    low_grad_crit=low_grad,iters=iters)
+    KOC,raw = TrCore.KOC_combined(spin_up_months=spin_up_time,iters=iters)
     print("--- %s seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
