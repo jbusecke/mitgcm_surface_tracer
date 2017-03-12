@@ -70,10 +70,10 @@ class tracer_engine:
     def reset_cut_mask(self,iters,tr_num,cut_time):
         total_time = self.total_time_model
         reset_frq  = int(self.modelparameters[
-                            'data.ptracers/PTRACERS_resetFreq('+tr_num+')'
+                            'data.ptracers/PTRACERS_resetFreq('+str(tr_num)+')'
                             ])
         reset_pha  = int(self.modelparameters[
-                            'data.ptracers/PTRACERS_resetPhase('+tr_num+')'
+                            'data.ptracers/PTRACERS_resetPhase('+str(tr_num)+')'
                             ])
         dt_model = self.dt_model
 
@@ -100,20 +100,12 @@ class tracer_engine:
         ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
                                         directory=directory)
 
-        required_fields = ['DXSqTr'+tr_num,'DYSqTr'+tr_num,'TRAC'+tr_num]
-        if not [a in ds_mean.keys() for a in required_fields].all():
-            raise RuntimeError('mean dataset does not have all required \
-                                    variables ('+ds_mean.keys()+')')
-        if not [a in ds_snap.keys() for a in required_fields].all():
-            raise RuntimeError('mean dataset does not have all required \
-                                    variables ('+ds_mean.keys()+')')
-
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
         KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,self.initpath,tr_num,\
                                 bins,\
                                 kappa=self.koc_kappa)
 
-        val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
+        val_idx = self.reset_cut_mask(ds_mean.iter.data,
                                             int(tr_num),
                                             spin_up_months*30*24*60*60)
 
@@ -227,6 +219,18 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
         if 'j' in snap['DYSqTr'+tr_num].dims:
             snap['DYSqTr'+tr_num] = xr.DataArray(snap['DYSqTr'+tr_num].data,\
                                        dims=snap.VVEL.dims,coords=snap.VVEL.coords)
+
+    required_fields = ['DXSqTr'+tr_num,'DYSqTr'+tr_num,'TRAC'+tr_num]
+
+    if method == 'L':
+        if not np.array([a in snap.keys() for a in required_fields]).all():
+           raise RuntimeError(['mean dataset does not have all required \
+                                   variables (']+snap.keys()+[')'])
+    elif method == 'T' or method == 'LT':
+        if not np.array([a in mean.keys() for a in required_fields]).all():
+           raise RuntimeError(['mean dataset does not have all required \
+                                   variables (']+mean.keys()+[')'])
+
 
     # snapshots averaged in space
     if method == 'L':
