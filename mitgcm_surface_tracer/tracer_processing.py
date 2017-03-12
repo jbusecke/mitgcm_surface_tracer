@@ -6,6 +6,7 @@ import re
 import numpy as np
 import xarray as xr
 from dask.diagnostics import ProgressBar
+import dask.array as da
 from xmitgcm import open_mdsdataset
 import xarrayutils as xut
 from .utils import readbin, paramReadout, dirCheck
@@ -70,10 +71,10 @@ class tracer_engine:
     def reset_cut_mask(self,iters,tr_num,cut_time):
         total_time = self.total_time_model
         reset_frq  = int(self.modelparameters[
-                            'data.ptracers/PTRACERS_resetFreq('+tr_num+')'
+                            'data.ptracers/PTRACERS_resetFreq('+str(tr_num)+')'
                             ])
         reset_pha  = int(self.modelparameters[
-                            'data.ptracers/PTRACERS_resetPhase('+tr_num+')'
+                            'data.ptracers/PTRACERS_resetPhase('+str(tr_num)+')'
                             ])
         dt_model = self.dt_model
 
@@ -100,20 +101,12 @@ class tracer_engine:
         ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
                                         directory=directory)
 
-        required_fields = ['DXSqTr'+tr_num,'DYSqTr'+tr_num,'TRAC'+tr_num]
-        if not [a in ds_mean.keys() for a in required_fields].all():
-            raise RuntimeError('mean dataset does not have all required \
-                                    variables ('+ds_mean.keys()+')')
-        if not [a in ds_snap.keys() for a in required_fields].all():
-            raise RuntimeError('mean dataset does not have all required \
-                                    variables ('+ds_mean.keys()+')')
-
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
         KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,self.initpath,tr_num,\
                                 bins,low_gradient_perc=low_grad_crit,\
                                 kappa=self.koc_kappa)
 
-        val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
+        val_idx = self.reset_cut_mask(ds_mean.iter.data,
                                             int(tr_num),
                                             spin_up_months*30*24*60*60)
 
@@ -193,29 +186,14 @@ def reset_cut(reset_frq,reset_pha,total_time,dt_model,iters,tr_num,cut_time):
 
 def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
             low_gradient_perc=0.1,debug=False,method='LT'):
-    func        = np.nansum #!!! with this i make all the masking pretty much
-    #obsolete but I had some crazy strong outliers around the small islands
     area        = snap.rA
     landmask_c  = snap.hFacC!=0
-    landmask_s  = snap.hFacS!=0
-    landmask_w  = snap.hFacS!=0
+    landmask_s  = snap.hFacS.data!=0
+    landmask_w  = snap.hFacS.data!=0
     landmask    = np.logical_or(np.logical_or(landmask_s,landmask_w),landmask_c)
     #### Masking ####
     valid_mask = xr.DataArray(readbin(validfile,area.shape)==0,\
                   dims=area.dims,coords=area.coords)
-    # the area needs to be masked at every point where there would be missing
-    # values produced by the gradients...so all landmasks combined
-    area        = area.where(landmask).where(valid_mask)
-    # this is later multiplied with the values so it should take care of
-    area_sum    = xut.aggregate(area,bins,func=func)
-
-    # Ok this needs some thorough invesigation, but is probably of minor importance (e.g. only near the coast)
-    # I mask out the area. Since all values are at some point multiplied with area (area weigthed ave)
-    # this should take care of the masking. A problem arises when the gradient operations create
-    # additional nans in the data, which are not covered in area and area_sum
-    # that could potentially throw of the area weighting around missing values
-    # HOWEVER I think this might not matter since pretty much everywhere the pixel
-    # near land are masked out by the validmask anyways.
 
     # Correct the false grid dimensions for the diagnoses output
     # !!! the uvel dims are taken...if there is no data var 'UVEL' or 'VVEL'
@@ -227,6 +205,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     if 'j' in mean['DYSqTr'+tr_num].dims:
         mean['DYSqTr'+tr_num] = xr.DataArray(mean['DYSqTr'+tr_num].data,\
                                        dims=mean.VVEL.dims,coords=mean.VVEL.coords)
+
     if 'DXSqTr'+tr_num in snap.data_vars.keys():
         if 'i' in snap['DXSqTr'+tr_num].dims:
             snap['DXSqTr'+tr_num] = xr.DataArray(snap['DXSqTr'+tr_num].data,\
@@ -236,19 +215,32 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
             snap['DYSqTr'+tr_num] = xr.DataArray(snap['DYSqTr'+tr_num].data,\
                                        dims=snap.VVEL.dims,coords=snap.VVEL.coords)
 
+    # Check if the inputs have the necessary data variables
+    required_fields = ['DXSqTr'+tr_num,'DYSqTr'+tr_num,'TRAC'+tr_num]
+    if method == 'L':
+        if not (np.array([a in snap.data_vars.keys() for a in required_fields]).all()):
+            raise RuntimeError(['snapshot dataset does not have all required \
+                                    variables (']+snap.data_vars.keys()+[')'])
+    elif method == 'T' or method == 'LT':
+        if not (np.array([a in mean.data_vars.keys() for a in required_fields]).all()):
+            raise RuntimeError(['mean dataset does not have all required \
+                                    variables (']+mean.data_vars.keys()+[')'])
+
     # snapshots averaged in space
     if method == 'L':
         data             = snap
         grid             = data.drop(data.data_vars.keys())
         grid_coarse      = xut.xmitgcm_utils.grid_aggregate(grid,bins)
+
+
         #Numerator
         q                = data['TRAC'+tr_num]
         q_gradx,q_grady  = xut.xmitgcm_utils.gradient(grid,q,recenter=True)
         q_grad_sq        = q_gradx**2 + q_grady**2
-        q_grad_sq_coarse = xut.aggregate(q_grad_sq*area,bins,func=func)/area_sum
+        q_grad_sq_coarse = xut.aggregate_w_nanmean(q_grad_sq.where(valid_mask),area,bins)
         n                = q_grad_sq_coarse
         #Denominator
-        q_coarse         = xut.aggregate(q*area,bins,func=func)/area_sum
+        q_coarse         = xut.aggregate_w_nanmean(q.where(valid_mask),area,bins)
         q_coarse_gradx,q_coarse_grady \
                          = xut.xmitgcm_utils.gradient(grid_coarse,q_coarse,recenter=True)
         q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
@@ -265,7 +257,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
                             xut.xmitgcm_utils.interpolateGtoC(grid,q_grady_sq_mean,dim='y')
         n                = q_grad_sq_mean
         # !!! this is not the right way to do it but its the same way ryan did it
-        n                = xut.aggregate(n*area,bins,func=func)/area_sum
+        n                = xut.aggregate_w_nanmean(n.where(valid_mask),area,bins)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
         q_mean_gradx,q_mean_grady \
@@ -273,21 +265,21 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
         q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
-        d                = xut.aggregate(d*area,bins,func=func)/area_sum
+        d                = xut.aggregate_w_nanmean(d,area,bins)
 
     elif method =='LT':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
         grid_coarse      = xut.xmitgcm_utils.grid_aggregate(grid,bins)
         #Numerator
-        q_gradx_sq_mean  = data['DXSqTr'+tr_num]
-        q_grady_sq_mean  = data['DYSqTr'+tr_num]
+        q_gradx_sq_mean  = data['DXSqTr'+tr_num].copy()
+        q_grady_sq_mean  = data['DYSqTr'+tr_num].copy()
         q_grad_sq_mean   = xut.xmitgcm_utils.interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
                             xut.xmitgcm_utils.interpolateGtoC(grid,q_grady_sq_mean,dim='y')
-        n                = xut.aggregate(q_grad_sq_mean*area,bins,func=func)/area_sum
+        n                = xut.aggregate_w_nanmean(q_grad_sq_mean.where(valid_mask),area,bins)
         #Denominator
-        q_mean           = data['TRAC'+tr_num]
-        q_mean_coarse    = xut.aggregate(q_mean*area,bins,func=func)/area_sum
+        q_mean           = data['TRAC'+tr_num].copy()
+        q_mean_coarse    = xut.aggregate_w_nanmean(q_mean.where(valid_mask),area,bins)
         q_mean_coarse_gradx,q_mean_coarse_grady  \
                          = xut.xmitgcm_utils.gradient(grid_coarse,q_mean_coarse,recenter=True)
         q_mean_grad_sq   = q_mean_coarse_gradx**2 + q_mean_coarse_grady**2
@@ -295,7 +287,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
 
     ### Export the 'raw tracer fields' ###
     raw              = data['TRAC'+tr_num].where(grid.hFacC!=0)
-    raw_coarse       = xut.aggregate(raw*area,bins,func=func)/area_sum
+    raw_coarse       = xut.aggregate_w_nanmean(raw.where(valid_mask),area,bins)
 
 
     # #Read initial conditions to determine which gradient is 'too low'
@@ -321,12 +313,23 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     co     = xut.xmitgcm_utils.matching_coords(grid_coarse,koc.dims)
     # !!! this is not necessarily enough (this needs to be automated to chose only the
     # corrds with all dims matching i,g,time)
+    dask_valid_mask = valid_mask.copy()
+    dask_valid_mask.data = da.from_array(dask_valid_mask.data,
+                                        dask_valid_mask.shape)
+    course_count = xut.aggregate(dask_valid_mask,bins,func=np.sum)
+    max_count = bins[0][1]*bins[1][1]
+    mask = course_count>=0.95*max_count
 
     d          = xr.DataArray(d.data,coords = co,dims = d.dims)
     n          = xr.DataArray(n.data,coords = co,dims = n.dims)
     koc        = xr.DataArray(koc.data,coords = co,dims = koc.dims)
-    raw_coarse = xr.DataArray(raw_coarse.data,coords = co,dims = raw_coarse.dims)
+    raw_coarse = xr.DataArray(raw_coarse.where(mask).data,coords = co,dims = raw_coarse.dims)
+    # testing
+    raw         = course_count
 
+    # add area and summed area for later averages
+    area        = area.where(landmask).where(valid_mask)
+    area_sum    = xut.aggregate(area,bins,func=np.nansum)
     d.coords['weighted_area']          = area_sum
     n.coords['weighted_area']          = area_sum
     koc.coords['weighted_area']        = area_sum
@@ -346,20 +349,22 @@ def main(ddir,initpath,odir,validmaskpath,
     print('out_dir:'+str(odir))
     print('validmaskpath:'+str(validmaskpath))
 
+
     print('### Initialize core class ###')
     TrCore = tracer_engine(ddir,initpath,koc_kappa=kappa,odir=odir,
                             validmaskpath=validmaskpath,
                             koc_interval=koc_interval,makedirs=True)
-    print("--- %s seconds ---" % (time.time() - start_time))
 
-    start_time = time.time()
+
     print('CALCULATE OSBORN-COX DIFFUSIVITY')
+    start_time = time.time()
     KOC,raw = TrCore.KOC_combined(spin_up_months=spin_up_time,\
                                     low_grad_crit=low_grad,iters=iters)
     print("--- %s seconds ---" % (time.time() - start_time))
 
-    start_time = time.time()
+
     print('SAVE TO FILE')
+    start_time = time.time()
     KOC.to_netcdf(TrCore.odir+'/'+'KOC_FINAL.nc')
     raw.to_netcdf(TrCore.odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))
