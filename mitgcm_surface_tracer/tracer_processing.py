@@ -14,7 +14,7 @@ class tracer_engine:
     """Make is easier doing many operations on the same
     grid."""
 
-    def __init__(self,ddir,initpath,koc_kappa=63,odir=None,mdir=None,
+    def __init__(self,ddir,koc_kappa=63,odir=None,mdir=None,
     griddir=None,koc_interval=20,
     validmaskpath=None,makedirs=False):
         # Predefined inputs
@@ -23,7 +23,6 @@ class tracer_engine:
         self.ref_date = '-'.join([str(x) for x in self.start_time[0:3]])
         # simple parsed inputs
         self.ddir = dirCheck(ddir,makedirs)
-        self.initpath = initpath
         # diagnosed small scale diff (k_num in Abernathey et al. 2013)
         self.koc_kappa = koc_kappa
         # The interval for coarsening the KOC data
@@ -101,7 +100,7 @@ class tracer_engine:
                                         directory=directory)
 
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
-        KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,self.initpath,tr_num,\
+        KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,tr_num,\
                                 bins,\
                                 kappa=self.koc_kappa)
 
@@ -182,7 +181,7 @@ def reset_cut(reset_frq,reset_pha,total_time,dt_model,iters,tr_num,cut_time):
         mask[idx] = 0
     return mask,reset_iters,reset_time
 
-def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
+def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
                 debug=False,method='LT'):
     func        = np.sum #!!! with this i make all the masking pretty much
     #obsolete but I had some crazy strong outliers around the small islands
@@ -290,13 +289,6 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     raw              = data['TRAC'+tr_num].where(grid.hFacC!=0)
     raw_coarse       = xut.aggregate(raw*area,bins,func=func)/area_sum
 
-
-    # #Read initial conditions to determine which gradient is 'too low'
-    q_init = xr.DataArray(readbin(initfile,grid.XC.shape),\
-                          dims=grid.XC.dims,coords=grid.XC.coords)
-    q_init_gradx,q_init_grady = xut.xmitgcm_utils.gradient(mean,q_init.where(valid_mask),recenter=True)
-    q_init_grad_sq = q_init_gradx**2 + q_init_grady**2
-
     # Final edits for output
     koc = n/d*kappa
 
@@ -316,7 +308,7 @@ def KOC_Full(snap,mean,validfile,initfile,tr_num,bins,kappa=63,\
     raw_coarse.coords['weighted_area'] = area_sum
     return koc,n,d,raw,raw_coarse
 
-def main(ddir,initpath,odir,validmaskpath,
+def main(ddir,odir,validmaskpath,
     koc_interval=20,kappa=63,iters='all',spin_up_time = 3):
     # spin_up_time in months
 
@@ -325,12 +317,11 @@ def main(ddir,initpath,odir,validmaskpath,
     #Their value from table B1 for a ptracer diff= 25 m^2/s
 
     print('data_dir:'+str(ddir))
-    print('Initial Condition Path:'+str(initpath))
     print('out_dir:'+str(odir))
     print('validmaskpath:'+str(validmaskpath))
 
     print('### Initialize core class ###')
-    TrCore = tracer_engine(ddir,initpath,koc_kappa=kappa,odir=odir,
+    TrCore = tracer_engine(ddir,koc_kappa=kappa,odir=odir,
                             validmaskpath=validmaskpath,
                             koc_interval=koc_interval,makedirs=True)
 
