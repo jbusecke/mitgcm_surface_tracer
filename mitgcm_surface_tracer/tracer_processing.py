@@ -5,9 +5,11 @@ import time
 import re
 import numpy as np
 import xarray as xr
+import dask.array as da
 from dask.diagnostics import ProgressBar
 from xmitgcm import open_mdsdataset
-import xarrayutils as xut
+from xarrayutils.utils import aggregate,aggregate_w_nanmean
+from xarrayutils.xmitgcm_utils import grid_aggregate,gradient,interpolateGtoC,matching_coords
 from .utils import readbin, paramReadout, dirCheck
 
 class tracer_engine:
@@ -181,16 +183,26 @@ def reset_cut(reset_frq,reset_pha,total_time,dt_model,iters,tr_num,cut_time):
         mask[idx] = 0
     return mask,reset_iters,reset_time
 
+def custom_coarse(a,area,bins,mask):
+    a  = a.where(mask)
+    a_coarse  = aggregate_w_nanmean(a,area,bins)
+    return a_coarse
+
+
 def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
                 debug=False,method='LT'):
     func        = np.sum #!!! with this i make all the masking pretty much
     #obsolete but I had some crazy strong outliers around the small islands
     area        = snap.rA
+
+    ## gittest
+
     #### Masking ####
     valid_mask = xr.DataArray(readbin(validfile,area.shape)==0,\
                   dims=area.dims,coords=area.coords)
-    area        = area.where(snap.hFacC!=0).where(valid_mask)
-    area_sum    = xut.aggregate(area,bins,func=func)
+    valid_mask = np.logical_or(valid_mask,)
+
+    area_sum    = aggregate(area,bins,func=func)
 
     # Ok this needs some thorough invesigation, but is probably of minor importance (e.g. only near the coast)
     # I mask out the area. Since all values are at some point multiplied with area (area weigthed ave)
@@ -203,6 +215,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     # Correct the false grid dimensions for the diagnoses output
     # !!! the uvel dims are taken...if there is no data var 'UVEL' or 'VVEL'
     # This will fail..it should be removed in the future
+
     if 'i' in mean['DXSqTr'+tr_num].dims:
         mean['DXSqTr'+tr_num] = xr.DataArray(mean['DXSqTr'+tr_num].data,\
                                        dims=mean.UVEL.dims,coords=mean.UVEL.coords)
@@ -230,70 +243,74 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
            raise RuntimeError(['mean dataset does not have all required \
                                    variables (']+mean.keys()+[')'])
 
-
     # snapshots averaged in space
     if method == 'L':
         data             = snap
         grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = xut.xmitgcm_utils.grid_aggregate(grid,bins)
+        grid_coarse      = grid_aggregate(grid,bins)
         #Numerator
         q                = data['TRAC'+tr_num]
-        q_gradx,q_grady  = xut.xmitgcm_utils.gradient(grid,q,recenter=True)
+        q_gradx,q_grady  = gradient(grid,q,recenter=True)
         q_grad_sq        = q_gradx**2 + q_grady**2
-        q_grad_sq_coarse = xut.aggregate(q_grad_sq*area,bins,func=func)/area_sum
+        q_grad_sq_coarse = custom_coarse(q_grad_sq,area,bins,valid_mask)
         n                = q_grad_sq_coarse
         #Denominator
-        q_coarse         = xut.aggregate(q*area,bins,func=func)/area_sum
+        q_coarse         = custom_coarse(q,area,bins,valid_mask)
         q_coarse_gradx,q_coarse_grady \
-                         = xut.xmitgcm_utils.gradient(grid_coarse,q_coarse,recenter=True)
+                         = gradient(grid_coarse,q_coarse,recenter=True)
         q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
         d                = q_coarse_grad_sq
     elif method == 'T':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = xut.xmitgcm_utils.grid_aggregate(grid,bins)
+        grid_coarse      = grid_aggregate(grid,bins)
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
-        q_grad_sq_mean   = xut.xmitgcm_utils.interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
-                            xut.xmitgcm_utils.interpolateGtoC(grid,q_grady_sq_mean,dim='y')
+        q_grad_sq_mean   = interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
+                            interpolateGtoC(grid,q_grady_sq_mean,dim='y')
         n                = q_grad_sq_mean
         # !!! this is not the right way to do it but its the same way ryan did it
-        n                = xut.aggregate(n*area,bins,func=func)/area_sum
+        n                = custom_coarse(n,area,bins,valid_mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_gradx,q_mean_grady  = xut.xmitgcm_utils.gradient(grid,q_mean,recenter=True)
+        q_mean_gradx,q_mean_grady  = gradient(grid,q_mean,recenter=True)
         q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
-        d                = xut.aggregate(d*area,bins,func=func)/area_sum
+        d                = custom_coarse(d,area,bins,valid_mask)
     elif method =='LT':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = xut.xmitgcm_utils.grid_aggregate(grid,bins)
+        grid_coarse      = grid_aggregate(grid,bins)
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
-        q_grad_sq_mean   = xut.xmitgcm_utils.interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
-                            xut.xmitgcm_utils.interpolateGtoC(grid,q_grady_sq_mean,dim='y')
-        n                = xut.aggregate(q_grad_sq_mean*area,bins,func=func)/area_sum
+
+        q_grad_sq_mean   = interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
+                            interpolateGtoC(grid,q_grady_sq_mean,dim='y')
+        n                = custom_coarse(q_grad_sq_mean,area,bins,valid_mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_coarse    = xut.aggregate(q_mean*area,bins,func=func)/area_sum
+        q_mean_coarse    = custom_coarse(q_mean,area,bins,valid_mask)
         q_mean_coarse_gradx,q_mean_coarse_grady  \
-                         = xut.xmitgcm_utils.gradient(grid_coarse,q_mean_coarse,recenter=True)
+                         = gradient(grid_coarse,q_mean_coarse,recenter=True)
         q_mean_grad_sq   = q_mean_coarse_gradx**2 + q_mean_coarse_grady**2
         d                = q_mean_grad_sq
 
     ### Export the 'raw tracer fields' ###
-    raw              = data['TRAC'+tr_num].where(grid.hFacC!=0)
-    raw_coarse       = xut.aggregate(raw*area,bins,func=func)/area_sum
+    raw              = data['TRAC'+tr_num]
+    raw_coarse       = custom_coarse(raw,area,bins,valid_mask)
 
     # Final edits for output
     koc = n/d*kappa
 
+    #Count of aggregated valid cells per output pixel.
+    valid_mask.data = da.from_array(valid_mask.data,valid_mask.data.shape)
+    valid_count = aggregate(valid_mask,bins,func=np.sum)
+
     #replace with coarse grid coords
-    co     = xut.xmitgcm_utils.matching_coords(grid_coarse,koc.dims)
+    co     = matching_coords(grid_coarse,koc.dims)
     # !!! this is not necessarily enough (this needs to be automated to chose only the
     # corrds with all dims matching i,g,time)
 
@@ -306,6 +323,11 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     n.coords['weighted_area']          = area_sum
     koc.coords['weighted_area']        = area_sum
     raw_coarse.coords['weighted_area'] = area_sum
+
+    d.coords['valid_count']            = valid_count
+    n.coords['valid_count']            = valid_count
+    koc.coords['valid_count']          = valid_count
+    raw_coarse.coords['valid_count']   = valid_count
     return koc,n,d,raw,raw_coarse
 
 def main(ddir,odir,validmaskpath,
