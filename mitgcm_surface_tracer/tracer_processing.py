@@ -191,26 +191,20 @@ def custom_coarse(a,area,bins,mask):
 
 def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
                 debug=False,method='LT'):
-    func        = np.sum #!!! with this i make all the masking pretty much
-    #obsolete but I had some crazy strong outliers around the small islands
-    area        = snap.rA
-
-    ## gittest
-
+    area        = mean.rA
+    area_sum    = aggregate(area,bins,func=np.sum)
     #### Masking ####
-    valid_mask = xr.DataArray(readbin(validfile,area.shape)==0,\
+    ## landmask
+    landmask_w = mean.hFacW.data != 0
+    landmask_s = mean.hFacS.data != 0
+    landmask_c = mean.hFacC !=0
+    landmask   = np.logical_and(np.logical_and(landmask_w,landmask_s),landmask_c)
+
+    ## validmask (update with landmask)
+    validmask = xr.DataArray(readbin(validfile,area.shape)==0,\
                   dims=area.dims,coords=area.coords)
-    valid_mask = np.logical_or(valid_mask,)
 
-    area_sum    = aggregate(area,bins,func=func)
-
-    # Ok this needs some thorough invesigation, but is probably of minor importance (e.g. only near the coast)
-    # I mask out the area. Since all values are at some point multiplied with area (area weigthed ave)
-    # this should take care of the masking. A problem arises when the gradient operations create
-    # additional nans in the data, which are not covered in area and area_sum
-    # that could potentially throw of the area weighting around missing values
-    # HOWEVER I think this might not matter since pretty much everywhere the pixel
-    # near land are masked out by the validmask anyways.
+    mask = np.logical_and(validmask,landmask)
 
     # Correct the false grid dimensions for the diagnoses output
     # !!! the uvel dims are taken...if there is no data var 'UVEL' or 'VVEL'
@@ -252,10 +246,10 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         q                = data['TRAC'+tr_num]
         q_gradx,q_grady  = gradient(grid,q,recenter=True)
         q_grad_sq        = q_gradx**2 + q_grady**2
-        q_grad_sq_coarse = custom_coarse(q_grad_sq,area,bins,valid_mask)
+        q_grad_sq_coarse = custom_coarse(q_grad_sq,area,bins,mask)
         n                = q_grad_sq_coarse
         #Denominator
-        q_coarse         = custom_coarse(q,area,bins,valid_mask)
+        q_coarse         = custom_coarse(q,area,bins,mask)
         q_coarse_gradx,q_coarse_grady \
                          = gradient(grid_coarse,q_coarse,recenter=True)
         q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
@@ -271,14 +265,14 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
                             interpolateGtoC(grid,q_grady_sq_mean,dim='y')
         n                = q_grad_sq_mean
         # !!! this is not the right way to do it but its the same way ryan did it
-        n                = custom_coarse(n,area,bins,valid_mask)
+        n                = custom_coarse(n,area,bins,mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
         q_mean_gradx,q_mean_grady  = gradient(grid,q_mean,recenter=True)
         q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
-        d                = custom_coarse(d,area,bins,valid_mask)
+        d                = custom_coarse(d,area,bins,mask)
     elif method =='LT':
         data             = mean
         grid             = data.drop(data.data_vars.keys())
@@ -289,10 +283,10 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
 
         q_grad_sq_mean   = interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
                             interpolateGtoC(grid,q_grady_sq_mean,dim='y')
-        n                = custom_coarse(q_grad_sq_mean,area,bins,valid_mask)
+        n                = custom_coarse(q_grad_sq_mean,area,bins,mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_coarse    = custom_coarse(q_mean,area,bins,valid_mask)
+        q_mean_coarse    = custom_coarse(q_mean,area,bins,mask)
         q_mean_coarse_gradx,q_mean_coarse_grady  \
                          = gradient(grid_coarse,q_mean_coarse,recenter=True)
         q_mean_grad_sq   = q_mean_coarse_gradx**2 + q_mean_coarse_grady**2
@@ -300,14 +294,14 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
 
     ### Export the 'raw tracer fields' ###
     raw              = data['TRAC'+tr_num]
-    raw_coarse       = custom_coarse(raw,area,bins,valid_mask)
+    raw_coarse       = custom_coarse(raw,area,bins,mask)
 
     # Final edits for output
     koc = n/d*kappa
 
     #Count of aggregated valid cells per output pixel.
-    valid_mask.data = da.from_array(valid_mask.data,valid_mask.data.shape)
-    valid_count = aggregate(valid_mask,bins,func=np.sum)
+    mask.data = da.from_array(mask.data,mask.data.shape)
+    mask_count = aggregate(mask,bins,func=np.sum)
 
     #replace with coarse grid coords
     co     = matching_coords(grid_coarse,koc.dims)
@@ -319,15 +313,20 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     koc        = xr.DataArray(koc.data,coords = co,dims = koc.dims)
     raw_coarse = xr.DataArray(raw_coarse.data,coords = co,dims = raw_coarse.dims)
 
-    d.coords['weighted_area']          = area_sum
-    n.coords['weighted_area']          = area_sum
-    koc.coords['weighted_area']        = area_sum
-    raw_coarse.coords['weighted_area'] = area_sum
+    d.coords['area']                  = area_sum
+    n.coords['area']                  = area_sum
+    koc.coords['area']                = area_sum
+    raw_coarse.coords['area']         = area_sum
 
-    d.coords['valid_count']            = valid_count
-    n.coords['valid_count']            = valid_count
-    koc.coords['valid_count']          = valid_count
-    raw_coarse.coords['valid_count']   = valid_count
+    d.coords['mask_count']            = mask_count
+    n.coords['mask_count']            = mask_count
+    koc.coords['mask_count']          = mask_count
+    raw_coarse.coords['mask_count']   = mask_count
+
+    raw.coords['landmask']            = landmask
+    raw.coords['validmask']           = validmask
+    raw.coords['mask']                = mask
+
     return koc,n,d,raw,raw_coarse
 
 def main(ddir,odir,validmaskpath,
