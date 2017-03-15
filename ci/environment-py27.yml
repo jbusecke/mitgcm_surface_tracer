@@ -7,8 +7,10 @@ dependencies:
   - pytest
   - future
   - scipy
+  - cloudpickle
   - pip:
     - codecov
     - pytest-cov
-    - xmitgcm
-    - "--editable=git+https://github.com/jbusecke/xarrayutils.git#egg=xarrayutils"
+    - "--editable=git+https://github.com/jbusecke/xmitgcm.git@master#egg=xmitgcm"
+    - "--editable=git+https://github.com/jbusecke/xarrayutils.git@develop#egg=xarrayutils"
+    - "--editable=git+https://github.com/jbusecke/mitgcm_surface_tracer.git@develop#egg=mitgcm_surface_tracer"

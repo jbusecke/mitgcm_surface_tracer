@@ -6,6 +6,7 @@ import re
 import numpy as np
 import xarray as xr
 import dask.array as da
+import xgcm
 from dask.diagnostics import ProgressBar
 from xmitgcm import open_mdsdataset
 from xarrayutils.utils import aggregate,aggregate_w_nanmean
@@ -17,8 +18,7 @@ class tracer_engine:
     """Make is easier doing many operations on the same
     grid."""
 
-    def __init__(self,ddir,koc_kappa=63,odir=None,mdir=None,
-    griddir=None,koc_interval=20,
+    def __init__(self,ddir,koc_kappa=63,koc_interval=20,
     validmaskpath=None,makedirs=False):
         # Predefined inputs
         # Start time of offline velocities [YYYY,MM,DD,HH,MM,SS]
@@ -38,36 +38,6 @@ class tracer_engine:
         self.dt_model = int(float(self.modelparameters['data/deltaTtracer']))
         self.total_time_model = int(float(self.modelparameters['data/nTimeSteps']))*self.dt_model
 
-
-        self.grid = open_mdsdataset(self.ddir,prefix=['tracer_diags'],
-                                    delta_t=self.dt_model,
-                                    ref_date=self.ref_date,
-                                    iters=None)
-
-        # Internal calculated inputs
-        self.dx         = self.grid['dxC'].data
-        self.dy         = self.grid['dyC'].data
-        self.area       = self.grid['rA'].data
-        self.x          = self.grid['XC'].data
-        self.y          = self.grid['YC'].data
-        self.depth      = self.grid['hFacC'].data
-        self.landmask   = self.depth==0
-
-
-        # optional input with defaults
-
-
-        if odir == None:
-            odir = ddir+'/output'
-        self.odir = dirCheck(odir,makedirs)
-
-        if mdir == None:
-            mdir = ddir+'/movies'
-        self.mdir = dirCheck(mdir,makedirs)
-
-        if griddir == None:
-            griddir = ddir
-        self.griddir = dirCheck(griddir,makedirs)
 
     def reset_cut_mask(self,iters,tr_num,cut_time):
         total_time = self.total_time_model
@@ -241,8 +211,8 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     # snapshots averaged in space
     if method == 'L':
         data             = snap
-        grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = grid_aggregate(grid,bins)
+        grid             = xgcm.Grid(data)
+        grid_coarse      = grid_aggregate(grid._ds,bins)
         #Numerator
         q                = data['TRAC'+tr_num]
         q_gradx,q_grady  = gradient(grid,q,interpolate=True)
@@ -257,13 +227,13 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         d                = q_coarse_grad_sq
     elif method == 'T':
         data             = mean
-        grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = grid_aggregate(grid,bins)
+        grid             = xgcm.Grid(data)
+        grid_coarse      = grid_aggregate(grid._ds,bins)
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
-        q_grad_sq_mean   = interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
-                            interpolateGtoC(grid,q_grady_sq_mean,dim='y')
+        q_grad_sq_mean   = grid.interp(q_gradx_sq_mean,'X') + \
+                            grid.interp(q_grady_sq_mean,'Y')
         n                = q_grad_sq_mean
         # !!! this is not the right way to do it but its the same way ryan did it
         n                = custom_coarse(n,area,bins,mask)
@@ -276,14 +246,14 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         d                = custom_coarse(d,area,bins,mask)
     elif method =='LT':
         data             = mean
-        grid             = data.drop(data.data_vars.keys())
-        grid_coarse      = grid_aggregate(grid,bins)
+        grid             = xgcm.Grid(data)
+        grid_coarse      = grid_aggregate(grid._ds,bins)
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
 
-        q_grad_sq_mean   = interpolateGtoC(grid,q_gradx_sq_mean,dim='x') + \
-                            interpolateGtoC(grid,q_grady_sq_mean,dim='y')
+        q_grad_sq_mean   = grid.interp(q_gradx_sq_mean,'X') + \
+                            grid.interp(q_grady_sq_mean,'Y')
         n                = custom_coarse(q_grad_sq_mean,area,bins,mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
@@ -305,7 +275,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     mask_count = aggregate(mask,bins,func=np.sum)
 
     #replace with coarse grid coords
-    co     = matching_coords(grid_coarse,koc.dims)
+    co     = matching_coords(grid_coarse._ds,koc.dims)
     # !!! this is not necessarily enough (this needs to be automated to chose only the
     # corrds with all dims matching i,g,time)
 
@@ -343,8 +313,7 @@ def main(ddir,odir,validmaskpath,
     print('validmaskpath:'+str(validmaskpath))
 
     print('### Initialize core class ###')
-    TrCore = tracer_engine(ddir,koc_kappa=kappa,odir=odir,
-                            validmaskpath=validmaskpath,
+    TrCore = tracer_engine(ddir,koc_kappa=kappa,validmaskpath=validmaskpath,
                             koc_interval=koc_interval,makedirs=True)
 
     print('CALCULATE OSBORN-COX DIFFUSIVITY')
@@ -355,8 +324,8 @@ def main(ddir,odir,validmaskpath,
 
     print('SAVE TO FILE')
     start_time = time.time()
-    KOC.to_netcdf(TrCore.odir+'/'+'KOC_FINAL.nc')
-    raw.to_netcdf(TrCore.odir+'/'+'KOC_RAW.nc')
+    KOC.to_netcdf(odir+'/'+'KOC_FINAL.nc')
+    raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))
 
 # maybe run this with the current dir as ddir and otherwise just defaults?
