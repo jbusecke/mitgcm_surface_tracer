@@ -9,7 +9,8 @@ import dask.array as da
 from dask.diagnostics import ProgressBar
 from xmitgcm import open_mdsdataset
 from xarrayutils.utils import aggregate,aggregate_w_nanmean
-from xarrayutils.xmitgcm_utils import grid_aggregate,gradient,interpolateGtoC,matching_coords
+from xarrayutils.build_grids import grid_aggregate
+from xarrayutils.xmitgcm_utils import gradient,matching_coords
 from .utils import readbin, paramReadout, dirCheck
 
 class tracer_engine:
