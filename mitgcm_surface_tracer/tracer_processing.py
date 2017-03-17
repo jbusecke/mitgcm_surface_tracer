@@ -10,6 +10,7 @@ import xgcm
 from dask.diagnostics import ProgressBar
 from xmitgcm import open_mdsdataset
 from xarrayutils.utils import aggregate,aggregate_w_nanmean
+from xarrayutils.xmitgcm_utils import gradient,matching_coords,laplacian,gradient_sq_amplitude
 from xarrayutils.build_grids import grid_aggregate
 from xarrayutils.xmitgcm_utils import gradient,matching_coords
 from .utils import readbin, paramReadout, dirCheck
@@ -159,9 +160,11 @@ def custom_coarse(a,area,bins,mask):
     a_coarse  = aggregate_w_nanmean(a,area,bins)
     return a_coarse
 
-
 def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
                 debug=False,method='LT'):
+    #!!! totally hacky...this needs to be replaced.
+    axis_bins   = [('X',bins[0][1]),('Y',bins[0][1])]
+    #
     area        = mean.rA
     area_sum    = aggregate(area,bins,func=np.sum)
     #### Masking ####
@@ -212,7 +215,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     if method == 'L':
         data             = snap
         grid             = xgcm.Grid(data)
-        grid_coarse      = grid_aggregate(grid._ds,bins)
+        grid_coarse      = xgcm.Grid(grid_aggregate(grid._ds,axis_bins))
         #Numerator
         q                = data['TRAC'+tr_num]
         q_gradx,q_grady  = gradient(grid,q,interpolate=True)
@@ -221,14 +224,12 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         n                = q_grad_sq_coarse
         #Denominator
         q_coarse         = custom_coarse(q,area,bins,mask)
-        q_coarse_gradx,q_coarse_grady \
-                         = gradient(grid_coarse,q_coarse,interpolate=True)
-        q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
+        q_coarse_grad_sq = gradient_sq_amplitude(grid_coarse,q_coarse)
         d                = q_coarse_grad_sq
     elif method == 'T':
         data             = mean
         grid             = xgcm.Grid(data)
-        grid_coarse      = grid_aggregate(grid._ds,bins)
+        grid_coarse      = xgcm.Grid(grid_aggregate(grid._ds,axis_bins))
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
@@ -239,15 +240,14 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         n                = custom_coarse(n,area,bins,mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_gradx,q_mean_grady  = gradient(grid,q_mean,interpolate=True)
-        q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
+        q_mean_grad_sq   = gradient_sq_amplitude(grid,q_mean)
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
         d                = custom_coarse(d,area,bins,mask)
     elif method =='LT':
         data             = mean
         grid             = xgcm.Grid(data)
-        grid_coarse      = grid_aggregate(grid._ds,bins)
+        grid_coarse      = xgcm.Grid(grid_aggregate(grid._ds,axis_bins))
         #Numerator
         q_gradx_sq_mean  = data['DXSqTr'+tr_num]
         q_grady_sq_mean  = data['DYSqTr'+tr_num]
@@ -258,10 +258,13 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         #Denominator
         q_mean           = data['TRAC'+tr_num]
         q_mean_coarse    = custom_coarse(q_mean,area,bins,mask)
-        q_mean_coarse_gradx,q_mean_coarse_grady  \
-                         = gradient(grid_coarse,q_mean_coarse,interpolate=True)
-        q_mean_grad_sq   = q_mean_coarse_gradx**2 + q_mean_coarse_grady**2
+        q_mean_grad_sq   = gradient_sq_amplitude(grid_coarse,q_mean_coarse)
         d                = q_mean_grad_sq
+
+    # Calculate the gradient criterion
+    crit_q_mean    = custom_coarse(data['TRAC'+tr_num],area,bins,mask)
+    crit_q_sq_mean = custom_coarse(data['TRACSQ'+tr_num],area,bins,mask)
+    crit           = gradient_criterion(grid_coarse,crit_q_mean,crit_q_sq_mean)
 
     ### Export the 'raw tracer fields' ###
     raw              = data['TRAC'+tr_num]
@@ -284,21 +287,37 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     koc        = xr.DataArray(koc.data,coords = co,dims = koc.dims)
     raw_coarse = xr.DataArray(raw_coarse.data,coords = co,dims = raw_coarse.dims)
 
-    d.coords['area']                  = area_sum
-    n.coords['area']                  = area_sum
-    koc.coords['area']                = area_sum
-    raw_coarse.coords['area']         = area_sum
+    d.coords['area']                          = area_sum
+    n.coords['area']                          = area_sum
+    koc.coords['area']                        = area_sum
+    raw_coarse.coords['area']                 = area_sum
 
-    d.coords['mask_count']            = mask_count
-    n.coords['mask_count']            = mask_count
-    koc.coords['mask_count']          = mask_count
-    raw_coarse.coords['mask_count']   = mask_count
+    d.coords['mask_count']                    = mask_count
+    n.coords['mask_count']                    = mask_count
+    koc.coords['mask_count']                  = mask_count
+    raw_coarse.coords['mask_count']           = mask_count
+
+    d.coords['gradient_criterion']            = crit
+    n.coords['gradient_criterion']            = crit
+    koc.coords['gradient_criterion']          = crit
+    raw_coarse.coords['gradient_criterion']   = crit
 
     raw.coords['landmask']            = landmask
     raw.coords['validmask']           = validmask
     raw.coords['mask']                = mask
 
     return koc,n,d,raw,raw_coarse
+
+def gradient_criterion(grid,q_mean,q_sq_mean):
+    lap_t           = laplacian(grid,q_mean)
+    grad_t          = gradient_sq_amplitude(grid,q_mean)
+    q_prime_sq_mean = q_sq_mean-q_mean**2
+    D   = (lap_t**2)**0.5/grad_t
+    phi = 1/np.sqrt(q_prime_sq_mean.where(q_prime_sq_mean>0))
+    crit = D/phi
+        # Notes
+    # - swap_dims needs to be deactivated in xmitgcm/open_mdsdataset
+    return crit
 
 def main(ddir,odir,validmaskpath,
     koc_interval=20,kappa=63,iters='all',spin_up_time = 3):
