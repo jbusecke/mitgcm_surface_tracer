@@ -218,8 +218,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         grid_coarse      = xgcm.Grid(grid_aggregate(grid._ds,axis_bins))
         #Numerator
         q                = data['TRAC'+tr_num]
-        q_gradx,q_grady  = gradient(grid,q,interpolate=True)
-        q_grad_sq        = q_gradx**2 + q_grady**2
+        q_grad_sq        = gradient_sq_amplitude(grid,q)
         q_grad_sq_coarse = custom_coarse(q_grad_sq,area,bins,mask)
         n                = q_grad_sq_coarse
         #Denominator
