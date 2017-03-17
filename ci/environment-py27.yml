@@ -11,6 +11,6 @@ dependencies:
   - pip:
     - codecov
     - pytest-cov
-    - "--editable=git://github.com/xgcm/xmitgcm.git@master#egg=xmitgcm"
+    - "--editable=git+git://github.com/xgcm/xmitgcm.git@master#egg=xmitgcm"
     - "--editable=git+https://github.com/jbusecke/xarrayutils.git@develop#egg=xarrayutils"
     - "--editable=git+https://github.com/jbusecke/mitgcm_surface_tracer.git@develop#egg=mitgcm_surface_tracer"
