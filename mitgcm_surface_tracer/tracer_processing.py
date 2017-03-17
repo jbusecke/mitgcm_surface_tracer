@@ -311,7 +311,8 @@ def gradient_criterion(grid,q_mean,q_sq_mean):
     lap_t           = laplacian(grid,q_mean)
     grad_t          = gradient_sq_amplitude(grid,q_mean)
     q_prime_sq_mean = q_sq_mean-q_mean**2
-    D   = (lap_t**2)**0.5/grad_t
+    D   = lap_t/grad_t
+    # Perhaps this needs to padded with zeros where q_prime_sq_mean<0
     phi = 1/np.sqrt(q_prime_sq_mean.where(q_prime_sq_mean>0))
     crit = D/phi
         # Notes
