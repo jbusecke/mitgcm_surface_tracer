@@ -245,14 +245,14 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         grid_coarse      = grid_aggregate(grid,bins)
         #Numerator
         q                = data['TRAC'+tr_num]
-        q_gradx,q_grady  = gradient(grid,q,recenter=True)
+        q_gradx,q_grady  = gradient(grid,q,interpolate=True)
         q_grad_sq        = q_gradx**2 + q_grady**2
         q_grad_sq_coarse = custom_coarse(q_grad_sq,area,bins,mask)
         n                = q_grad_sq_coarse
         #Denominator
         q_coarse         = custom_coarse(q,area,bins,mask)
         q_coarse_gradx,q_coarse_grady \
-                         = gradient(grid_coarse,q_coarse,recenter=True)
+                         = gradient(grid_coarse,q_coarse,interpolate=True)
         q_coarse_grad_sq = q_coarse_gradx**2+q_coarse_grady**2
         d                = q_coarse_grad_sq
     elif method == 'T':
@@ -269,7 +269,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         n                = custom_coarse(n,area,bins,mask)
         #Denominator
         q_mean           = data['TRAC'+tr_num]
-        q_mean_gradx,q_mean_grady  = gradient(grid,q_mean,recenter=True)
+        q_mean_gradx,q_mean_grady  = gradient(grid,q_mean,interpolate=True)
         q_mean_grad_sq   = q_mean_gradx**2 + q_mean_grady**2
         d                = q_mean_grad_sq
         # !!! this is not the right way to do it but its the same way ryan did it
@@ -289,7 +289,7 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
         q_mean           = data['TRAC'+tr_num]
         q_mean_coarse    = custom_coarse(q_mean,area,bins,mask)
         q_mean_coarse_gradx,q_mean_coarse_grady  \
-                         = gradient(grid_coarse,q_mean_coarse,recenter=True)
+                         = gradient(grid_coarse,q_mean_coarse,interpolate=True)
         q_mean_grad_sq   = q_mean_coarse_gradx**2 + q_mean_coarse_grady**2
         d                = q_mean_grad_sq
 
