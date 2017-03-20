@@ -308,13 +308,13 @@ def KOC_Full(snap,mean,validfile,tr_num,bins,kappa=63,\
     return koc,n,d,raw,raw_coarse
 
 def gradient_criterion(grid,q_mean,q_sq_mean):
-    lap_t           = laplacian(grid,q_mean)
-    grad_t          = gradient_sq_amplitude(grid,q_mean)
-    q_prime_sq_mean = q_sq_mean-q_mean**2
-    D   = lap_t/grad_t
+    lap_q           = laplacian(grid,q_mean)
+    grad_q          = gradient_sq_amplitude(grid,q_mean)
+    q_prime_sq_mean = q_sq_mean-(q_mean**2)
     # Perhaps this needs to padded with zeros where q_prime_sq_mean<0
-    phi = 1/np.sqrt(q_prime_sq_mean.where(q_prime_sq_mean>0))
-    crit = D/phi
+    phi             = q_prime_sq_mean.where(q_prime_sq_mean>0)/2
+    D               = lap_q/grad_q
+    crit            = D*np.sqrt(phi)
         # Notes
     # - swap_dims needs to be deactivated in xmitgcm/open_mdsdataset
     return crit
