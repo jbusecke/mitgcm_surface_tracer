@@ -341,6 +341,8 @@ def main(ddir,odir,validmaskpath,
     KOC,raw = TrCore.KOC_combined(spin_up_months=spin_up_time,iters=iters)
     print("--- %s seconds ---" % (time.time() - start_time))
 
+    # Adding attrbs and run infos
+    
 
     print('SAVE TO FILE')
     start_time = time.time()
