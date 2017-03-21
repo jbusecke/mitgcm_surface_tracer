@@ -14,4 +14,3 @@ dependencies:
     - "--editable=git+https://github.com/xgcm/xmitgcm.git@master#egg=xmitgcm"
     - "--editable=git+https://github.com/xgcm/xgcm.git@master#egg=xgcm"
     - "--editable=git+https://github.com/jbusecke/xarrayutils.git@master#egg=xarrayutils"
-    - "--editable=git+https://github.com/jbusecke/mitgcm_surface_tracer.git@master#egg=mitgcm_surface_tracer"
