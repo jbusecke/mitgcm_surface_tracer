@@ -71,11 +71,13 @@ class tracer_engine:
 
         ds_mean = self.dataset_readin(['tracer_diags'],iters=iters,
                                         directory=directory)
-        ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
-                                        directory=directory)
+        # Right now this is not used. To save time I will deactivate the
+        # snapshot tracer output and put the mean into the routine
+        # ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
+        #                                 directory=directory)
 
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
-        KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,tr_num,\
+        KOC,N,D,R,RC= KOC_Full(ds_mean,ds_mean,self.validmaskpath,tr_num,\
                                 bins,\
                                 kappa=self.koc_kappa)
 
@@ -342,7 +344,7 @@ def main(ddir,odir,validmaskpath,
     print("--- %s seconds ---" % (time.time() - start_time))
 
     # Adding attrbs and run infos
-    
+
 
     print('SAVE TO FILE')
     start_time = time.time()
