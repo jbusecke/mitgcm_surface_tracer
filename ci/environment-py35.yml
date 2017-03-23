@@ -8,6 +8,7 @@ dependencies:
   - future
   - scipy
   - cloudpickle
+  - matplotlib
   - pip:
     - codecov
     - pytest-cov
