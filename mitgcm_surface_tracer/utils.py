@@ -5,7 +5,7 @@ import os
 def writebin(a,file):
     '''Reads MITgcm bin input files
     a = np.array to save
-    file = filepath to the bin
+    file = filepath
     '''
     f = open(file, 'w')
     a.astype(dtype=np.dtype('float32').newbyteorder ('>')).tofile(f)
