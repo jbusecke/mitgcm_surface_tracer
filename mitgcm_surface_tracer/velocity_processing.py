@@ -46,9 +46,9 @@ def combine_validmask(data_dir, shape=None, debug=False):
 
 
 def process_aviso(odir, gdir, ddir_dt,
-                  fid_dt='dt_global_allsat_msla_uv',
+                  fid_dt='dt_global_allsat_msla_uv_*.nc',
                   ddir_nrt=None,
-                  fid_nrt='nrt_global_allsat_msla_uv',
+                  fid_nrt='nrt_global_allsat_msla_uv_*.nc',
                   interpolate=True):
     """read aviso files into xarray dataset, respecting 'seam' between
     delayed-time
