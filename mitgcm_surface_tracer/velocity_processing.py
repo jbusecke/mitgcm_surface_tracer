@@ -45,8 +45,11 @@ def combine_validmask(data_dir, shape=None, debug=False):
     print('--- combined validmask written to '+fpath+' ---')
 
 
-def process_aviso(odir, gdir, ddir_dt, fid_dt,
-                  ddir_nrt=None, fid_nrt=None, interpolate=True):
+def process_aviso(odir, gdir, ddir_dt,
+                  fid_dt='dt_global_allsat_msla_uv',
+                  ddir_nrt=None,
+                  fid_nrt='nrt_global_allsat_msla_uv',
+                  interpolate=True):
     """read aviso files into xarray dataset, respecting 'seam' between
     delayed-time
     product and near-real time products
@@ -79,7 +82,7 @@ def process_aviso(odir, gdir, ddir_dt, fid_dt,
     f = open(odir+'/transitiondate.txt', 'w')
     f.write(str(transition_date))
     f.close()
-    print('--- startdate written to '+odir+'/startdate.txt ---')
+    print('--- transition date written to '+odir+'/startdate.txt ---')
 
     # create and save validmask
     # validmask indicates values that were interpolated or filled
