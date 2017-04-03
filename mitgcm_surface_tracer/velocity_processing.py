@@ -4,9 +4,15 @@ import numpy as np
 import time
 import os
 import os.path
+<<<<<<< HEAD
+=======
+import matplotlib as mpl
+>>>>>>> corrected validmask
 from xmitgcm import open_mdsdataset
 from xarrayutils.numpy_utils import interp_map_regular_grid
 from .utils import readbin, writebin
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 
 def validmask_aviso(da_u, da_v):
@@ -91,7 +97,11 @@ def process_aviso(odir, gdir, ddir_dt, fid_dt,
                                             grid.XC.data,
                                             grid.YC.data)
     # fill the values between 0 and with 1 to exclude them from valid points.
+<<<<<<< HEAD
     validmask_mit[validmask_mit != 1] = 0
+=======
+    validmask_mit[validmask_mit != 0] = 1
+>>>>>>> corrected validmask
     writebin(validmask_mit, odir+'/validmask.bin')
     print('--- validmask written to '+odir+'/validmask.bin ---')
 
@@ -128,3 +138,8 @@ def process_aviso(odir, gdir, ddir_dt, fid_dt,
 
     print("--- Velocity Interpolation took %s seconds ---"
           % (time.time() - start_time))
+<<<<<<< HEAD
+=======
+
+    return ds
+>>>>>>> corrected validmask
