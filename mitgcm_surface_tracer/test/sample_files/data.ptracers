@@ -1,0 +1,24 @@
+&PTRACERS_PARM01
+ PTRACERS_numInUse=1,
+ PTRACERS_Iter0= 0,
+# modified version for sjoerds sst model comparison
+# two days = 172800 2
+# one year = 31449600 s
+# one month = 2419200
+# 5 days = 432000
+# 7 days = 604800
+# 13 months (current KOC setup) = 31449600(phase= 15724800) 
+ PTRACERS_dumpFreq=0,
+ PTRACERS_taveFreq=0.,
+#
+ PTRACERS_names(1)='SSS1',
+ PTRACERS_advScheme(1)=77,
+ PTRACERS_diffKh(1)=25.,
+ PTRACERS_initialFile(1)='SSS_tracer.bin',
+ PTRACERS_resetFreq(1)=31449600.,
+# PTRACERS_resetPhase(1)=0.,
+# safety margin to make sure the diagnostics do not include the reset
+ PTRACERS_resetPhase(1)=0.,
+&
+
+
