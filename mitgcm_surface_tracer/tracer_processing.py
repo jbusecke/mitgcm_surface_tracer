@@ -181,8 +181,7 @@ def KOC_Full(snap, mean, validfile, tr_num, bins, kappa=63,
     landmask = np.logical_and(np.logical_and(landmask_w, landmask_s),
                               landmask_c)
 
-    # validmask (update with landmask)
-    validmask = xr.DataArray(readbin(validfile, area.shape) == 0,
+    validmask = xr.DataArray(readbin(validfile, area.shape),
                              dims=area.dims, coords=area.coords)
 
     mask = np.logical_and(validmask, landmask)

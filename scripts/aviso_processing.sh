@@ -28,18 +28,21 @@ do
     echo "Crossover year"
     python -c 'from mitgcm_surface_tracer.velocity_processing \
     import process_aviso; \
-    process_aviso("'$OUTDIR/$y'", "'$GRIDDIR'", "'$DTDIR/$y'", ddir_nrt="'$NRTDIR/$y'")'
+    process_aviso("'$OUTDIR/$y'", "'$GRIDDIR'", "'$DTDIR/$y'", ddir_nrt="'$NRTDIR/$y'");\
+    exit();'
   else
     echo "non crossover year"
     python -c 'from mitgcm_surface_tracer.velocity_processing \
     import process_aviso; \
-    process_aviso("'$OUTDIR/$y'", "'$GRIDDIR'", "'$DTDIR/$y'")'
+    process_aviso("'$OUTDIR/$y'", "'$GRIDDIR'", "'$DTDIR/$y'");\
+    exit();'
   fi
 done
 
 # Combine validmask
 python -c 'from mitgcm_surface_tracer.velocity_processing \
-import combine_validmask; combine_validmask("'$OUTDIR'", shape=(1600,3600))'
+import combine_validmask; combine_validmask("'$OUTDIR'", shape=(1600,3600));\
+exit();'
 
 # softlink into combined directory with consequtive numbers
 mkdir $OUTDIR/combined
