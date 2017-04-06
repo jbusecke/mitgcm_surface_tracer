@@ -53,7 +53,7 @@ class tracer_engine:
         mask,_,_ = reset_cut(reset_frq,reset_pha,
                             total_time,dt_model,
                             iters,tr_num,cut_time)
-        return mask
+        return mask,reset_iters,reset_time
 
     def dataset_readin(self,prefix,directory=None,iters='all'):
         if directory == None:
@@ -76,9 +76,9 @@ class tracer_engine:
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
         KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,tr_num,\
                                 bins,\
-                                kappa=self.koc_kappa)
+                                kappa=self.koc_kappa)``
 
-        val_idx = self.reset_cut_mask(ds_mean.iter.data,
+        val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
                                             int(tr_num),
                                             spin_up_months*30*24*60*60)
 
