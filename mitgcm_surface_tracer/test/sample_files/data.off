@@ -1,0 +1,22 @@
+ &OFFLINE_PARM01
+  UvelFile= '/vega/physo/users/jb3210/offline_velocities/aviso_DUACS2014_daily_msla/div_corrected/uvelCorr',
+  VvelFile= '/vega/physo/users/jb3210/offline_velocities/aviso_DUACS2014_daily_msla/div_corrected/vvelCorr',
+# this mean file is from the older run but still from the same DUACS product, so that should be fine
+  UMeanFile='/vega/physo/projects/global_tracer/avisoDUACS2014_0.1_degree-mdt-corr/uvelCorr.0000000001.data',
+  VMeanFile='/vega/physo/projects/global_tracer/avisoDUACS2014_0.1_degree-mdt-corr/vvelCorr.0000000001.data', 
+ &
+
+ &OFFLINE_PARM02
+  offlineLoadPrec=32,
+  offlineIter0=0,
+# one day. Is this the 
+  deltaToffline=86400.,
+# 3.5 days(need to substract 1 time interval so that the last iteration doesnt call nonexisting file)
+# 43200+900
+  offlineTimeOffset=44100.0,
+# 8 days
+  offlineForcingPeriod=86400.,
+# turn off cycling
+  offlineForcingCycle=0.,
+ &
+
