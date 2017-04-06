@@ -49,10 +49,10 @@ class tracer_engine:
             'data.ptracers/PTRACERS_resetPhase('+str(tr_num)+')'])
         dt_model = self.dt_model
 
-        mask,_,_ = reset_cut(reset_frq,reset_pha,
-                            total_time,dt_model,
-                            iters,tr_num,cut_time)
-        return mask,reset_iters,reset_time
+        mask, reset_iters, reset_time = reset_cut(reset_frq, reset_pha,
+                                                  total_time, dt_model,
+                                                  iters, tr_num, cut_time)
+        return mask, reset_iters, reset_time
 
     def dataset_readin(self, prefix, directory=None, iters='all'):
         if directory is None:
