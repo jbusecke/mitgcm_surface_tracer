@@ -79,7 +79,7 @@ class tracer_engine:
         bins = [('j',self.koc_interval),('i',self.koc_interval)]
         KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,tr_num,\
                                 bins,\
-                                kappa=self.koc_kappa)``
+                                kappa=self.koc_kappa)
 
         val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
                                             int(tr_num),
