@@ -9,14 +9,14 @@
 if [ "$1" == "dev" ]
 then
   echo "DEV MODE ACTIVE"
-  RUNDIR="/Volumes/SPURS_EXTERNAL_RAW_DATA/run_KOC_daily_SST_new"
-  PYTHONDIR="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/ROUTINES/SETUP"
-  PBSDIR=$PYTHONDIR
+  RUNDIR="/Users/juliusbusecke/Desktop/TimeMachineExcluded/run_debug_checkGradPosition"
+  # PYTHONDIR="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/ROUTINES/SETUP"
+  # PBSDIR=$PYTHONDIR
   VALIDPATH="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/OUTPUT/AVISO_validmask/validmask_combined.bin"
 else
   RUNDIR=$PBS_O_WORKDIR
-  PYTHONDIR=/vega/physo/users/jb3210/tracer_model_scripts
-  PBSDIR=$RUNDIR
+  # PYTHONDIR=/vega/physo/users/jb3210/tracer_model_scripts
+  # PBSDIR=$RUNDIR
   VALIDPATH="/swot/SUM05/julius/offline_velocities/interpolatedvalidmask_combined.bin"
   module add anaconda/4.1.1-python-2.7.12
   source activate standard
@@ -46,7 +46,6 @@ python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
 main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     koc_interval=10,\
     kappa=63,\
-    iters='all',\
     spin_up_time = 2);\
 exit();'
 echo "PBS PROCESSING SCRIPT DONE"

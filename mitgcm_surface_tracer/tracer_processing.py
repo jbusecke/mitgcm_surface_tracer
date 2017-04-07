@@ -87,14 +87,25 @@ class tracer_engine:
                                     bins,
                                     kappa=self.koc_kappa)
 
-        val_idx, _, _ = self.reset_cut_mask(ds_mean.iter.data, int(tr_num),
-                                            spin_up_months*30*24*60*60)
+        val_idx, reset_idx, reset_ti = self.reset_cut_mask(ds_mean.iter.data,
+                                                           int(tr_num),
+                                                           spin_up_months
+                                                           *30*24*60*60)
 
         ds = xr.Dataset({'KOC': KOC,
                          'Numerator': N,
                          'Denominator': D,
                          'AveTracer': RC})
         ds.coords['valid_index'] = (['time'], val_idx)
+        ds['valid_index'].attrs = {'Description':
+                                   'Time mask to eliminate spin up'}
+        ds.coords['reset_index'] = reset_idx
+        ds['reset_index'].attrs = {'Description':
+                                   'Index of time closest after research'}
+        ds.coords['reset_time'] = reset_ti
+        ds['reset_time'].attrs = {'Description':
+                                  'exact reset time',
+                                  'Units': 'seconds after 1993-1-1 00:00:00'}
         return ds, R
 
     def KOC_combined(self, directory=None, interval=None,

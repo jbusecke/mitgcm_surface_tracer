@@ -27,8 +27,8 @@ module add intel-parallel-studio/2015
 mpirun -n 128 ./mitgcmuv
 
 
-# module add anaconda/4.1.1-python-2.7.12
-# source activate standard
-# echo "Rendering movie $RUNDIR"
-# python -c 'from xarrayutils.visualization import mitgcm_Movie;\
-#       mitgcm_Movie("$RUNDIR")'
+module add anaconda/4.1.1-python-2.7.12
+source activate standard
+echo "Rendering movie $RUNDIR"
+python -c 'from xarrayutils.visualization import mitgcm_Movie;\
+      mitgcm_Movie("$RUNDIR")'
