@@ -37,21 +37,24 @@ class tracer_engine:
         self.tracernum = np.arange(
             int(self.modelparameters['data.ptracers/PTRACERS_numInUse']))+1
         self.dt_model = int(float(self.modelparameters['data/deltaTtracer']))
-        self.total_time_model = int(float(
-            self.modelparameters['data/nTimeSteps']))*self.dt_model
+        self.total_iters_model = int(float(
+                                     self.modelparameters['data/nTimeSteps']))
 
     def reset_cut_mask(self, iters, tr_num, cut_time):
-        total_time = self.total_time_model
+        # +1 to account for iter0
+        # total_iters = self.total_iters_model
         reset_frq = int(self.modelparameters[
                             'data.ptracers/PTRACERS_resetFreq('+str(tr_num)+')'
                             ])
         reset_pha = int(self.modelparameters[
             'data.ptracers/PTRACERS_resetPhase('+str(tr_num)+')'])
         dt_model = self.dt_model
+        dt_tracer = abs(int(float(self.modelparameters[
+            'data.diagnostics/frequency('+str(tr_num)+')'])))
 
         mask, reset_iters, reset_time = reset_cut(reset_frq, reset_pha,
-                                                  total_time, dt_model,
-                                                  iters, tr_num, cut_time)
+                                                  dt_model, dt_tracer,
+                                                  iters, cut_time)
         return mask, reset_iters, reset_time
 
     def dataset_readin(self, prefix, directory=None, iters='all'):
@@ -76,13 +79,15 @@ class tracer_engine:
         # ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
         #                                 directory=directory)
 
-        bins = [('j',self.koc_interval),('i',self.koc_interval)]
-        KOC,N,D,R,RC= KOC_Full(ds_snap,ds_mean,self.validmaskpath,tr_num,\
-                                bins,\
-                                kappa=self.koc_kappa)
+        bins = [('j', self.koc_interval), ('i', self.koc_interval)]
+        KOC, N, D, R, RC = KOC_Full(ds_mean,
+                                    ds_mean,
+                                    self.validmaskpath,
+                                    tr_num,
+                                    bins,
+                                    kappa=self.koc_kappa)
 
-        val_idx,_,_ = self.reset_cut_mask(ds_mean.iter.data,
-                                            int(tr_num),
+        val_idx, _, _ = self.reset_cut_mask(ds_mean.iter.data, int(tr_num),
                                             spin_up_months*30*24*60*60)
 
         ds = xr.Dataset({'KOC': KOC,
@@ -117,8 +122,7 @@ class tracer_engine:
         return KOC, rawKOC
 
 
-def reset_cut(reset_frq, reset_pha, total_time,
-              dt_model, iters, tr_num, cut_time):
+def reset_cut(reset_frq, reset_pha, dt_model, dt_tracer, iters, cut_time):
     """
     determine the timing of reset and define cut index
 
@@ -128,20 +132,22 @@ def reset_cut(reset_frq, reset_pha, total_time,
 
     Input:  reset_frq - frequency of reset in seconds
             reset_pha - phase of reset in seconds
-            total_time - total time of model run in seconds
             dt_model - timestep of model in seconds
+            dt_tracer - timestep of tracer output
             iters - numpy array of iterations on which index is constructed
-            tr_num = str of tracernumber to be considered
-                (based on data.ptracers)
             cut_time = [in seconds] time after (before; if negative number)
             the reset that should be masked by
+    Output: mask -
+            reset_iters -
+            reset_time -
     """
-
-    tr_num = str(tr_num)
-    reset_time = np.arange(reset_pha, total_time + 1, reset_frq)
+    reset_time = np.array(range(reset_pha,
+                                (iters.max()*dt_model)+dt_model,
+                                reset_frq),
+                          dtype=int)
 
     # iteration 0 is always considered a reset
-    if reset_time[0] is not 0:
+    if not reset_time[0] == 0:
         reset_time = np.concatenate((np.array([0]), reset_time))
 
     # ceil the values if reset times dont divide without remainder
@@ -149,6 +155,12 @@ def reset_cut(reset_frq, reset_pha, total_time,
     # after the reset and for averages it ensures that the 'reset average'
     # contains the actual reset time
     reset_iters = np.ceil(reset_time/float(dt_model))
+    # round iters to nearest tracer iters
+    tracer_iters = float(dt_tracer)/float(dt_model)
+    reset_iters = np.ceil(reset_iters/tracer_iters)*tracer_iters
+    # remove iters that are bigger then iter max
+    while reset_iters[-1] > iters.max():
+        reset_iters = reset_iters[0:-1]
 
     # translate cut time to iters (round down)
     cut = np.ceil(cut_time/float(dt_model))
