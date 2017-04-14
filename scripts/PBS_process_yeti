@@ -9,7 +9,7 @@
 if [ "$1" == "dev" ]
 then
   echo "DEV MODE ACTIVE"
-  RUNDIR="/Users/juliusbusecke/Desktop/TimeMachineExcluded/run_debug_checkGradPosition"
+  RUNDIR="/Users/juliusbusecke/Desktop/TimeMachineExcluded/QC_setups/run_debug_checkGradPosition"
   # PYTHONDIR="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/ROUTINES/SETUP"
   # PBSDIR=$PYTHONDIR
   VALIDPATH="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/OUTPUT/AVISO_validmask/validmask_combined.bin"
@@ -23,6 +23,9 @@ else
 fi
 
 ODIR="$RUNDIR/output"
+PDIR="$RUNDIR/plots"
+# reset months
+RESET=3
 
 cd $RUNDIR
 echo 'REMOVING OLD DIRECTORIES'
@@ -41,11 +44,20 @@ fi
 
 # remake the directory
 mkdir $ODIR
+mkdir $PDIR
+
 echo 'START PYTHON READOUT'
 python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
 main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     koc_interval=10,\
     kappa=63,\
-    spin_up_time = 2);\
+    spin_up_time = float("'$RESET'"));\
 exit();'
+
+echo 'START PYTHON QC PLOTS'
+python -c 'from mitgcm_surface_tracer.tracer_visualization import main;\
+main("'$RUNDIR/'","'$PDIR/'",\
+    spin_up_time = float("'$RESET'"));\
+exit();'
+
 echo "PBS PROCESSING SCRIPT DONE"

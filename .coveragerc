@@ -10,3 +10,4 @@ exclude_lines =
 ignore_errors = True
 omit = mitgcm_surface_tracer/test/*
        mitgcm_surface_tracer/__init__.py
+       mitgcm_surface_tracer/tracer_visualization.py
