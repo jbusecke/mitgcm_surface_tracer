@@ -350,7 +350,7 @@ def gradient_criterion(grid, q_mean, q_sq_mean):
     q_prime_sq_mean = q_sq_mean-(q_mean**2)
     # Perhaps this needs to padded with zeros where q_prime_sq_mean<0
     phi = q_prime_sq_mean.where(q_prime_sq_mean > 0)/2
-    D = lap_q/grad_q
+    D = abs(lap_q)/grad_q
     crit = D*np.sqrt(phi)
     # Notes
     # - swap_dims needs to be deactivated in xmitgcm/open_mdsdataset
