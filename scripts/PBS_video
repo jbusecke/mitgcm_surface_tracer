@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+#PBS -l nodes=2,walltime=3:00:00,mem=128gb
+#PBS -W group_list=yetiphyso
+#PBS -N aviso_tracer_video
+#PBS -m abe
+#PBS -M juliusbusecke@gmail.com
+
+RUNDIR=$PBS_O_WORKDIR
+
+echo "Creating standard video in  $RUNDIR"
+cd $RUNDIR
+
+rm aviso_tracer_video*
+module load ffmpeg/2016
+source activate standard
+python -c 'from xarrayutils.visualization import mitgcm_Movie; mitgcm_Movie("'$RUNDIR'"); exit();'
