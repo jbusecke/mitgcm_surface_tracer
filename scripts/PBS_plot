@@ -18,7 +18,6 @@ else
   # PYTHONDIR=/vega/physo/users/jb3210/tracer_model_scripts
   # PBSDIR=$RUNDIR
   VALIDPATH="/vega/physo/users/jb3210/offline_velocities/aviso_DUACS2014_daily_msla/interpolated/validmask_combined.bin"
-  module add anaconda/4.1.1-python-2.7.12
   source activate standard
 fi
 

@@ -1,11 +1,11 @@
 import matplotlib
+matplotlib.use('Agg')
 import datetime
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from .tracer_processing import tracer_engine
 from .utils import dirCheck
-matplotlib.use('Agg')
 
 
 def QC_reset_plot(ds_di, ds_sn, tr_engine, cut_time, tr_num, ylim=None):
