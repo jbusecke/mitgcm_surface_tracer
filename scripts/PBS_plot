@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 #PBS -W group_list=yetiphyso
-#PBS -N python_processing_new
-#PBS -l nodes=1:ppn=16,walltime=4:00:00,mem=64000mb
+#PBS -N python_pplotting
+#PBS -l nodes=1:ppn=16,walltime=1:00:00,mem=64000mb
 #PBS -m abe
 #PBS -M juliusbusecke@gmail.com
 
@@ -22,37 +22,15 @@ else
   source activate standard
 fi
 
-ODIR="$RUNDIR/output"
-# reset months
-RESET=3
 
-cd $RUNDIR
-echo 'REMOVING OLD DIRECTORIES'
-
-if [ "$1" == "dev" ]
-then
-  echo 'old directories not removed in dev mode'
-else
-
-  # current folder structure
-  rm -r output
-  rm -r plots
-  rm -r movie*
-  rm -r python*
-fi
+PDIR="$RUNDIR/plots"
+rm -r plots
 
 # remake the directory
 mkdir $ODIR
 
-echo 'START PYTHON READOUT'
-python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
-main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
-    koc_interval=10,\
-    kappa=63,\
+echo 'START PYTHON QC PLOTS'
+python -c 'from mitgcm_surface_tracer.tracer_visualization import main;\
+main("'$RUNDIR/'","'$PDIR/'",\
     spin_up_time = float("'$RESET'"));\
 exit();'
-
-
-echo "PBS PROCESSING SCRIPT DONE"
-
-qsub PBS_plot
