@@ -38,13 +38,14 @@ else
   rm -r output
   rm -r plots
   rm -r movie*
-  rm -r python*
+  rm -r python_*
 fi
 
 # remake the directory
 mkdir $ODIR
 
 echo 'START PYTHON READOUT'
+echo 'Test new version'
 python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
 main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     koc_interval=10,\
