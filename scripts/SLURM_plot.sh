@@ -32,6 +32,5 @@ mkdir $PDIR
 
 echo 'START PYTHON QC PLOTS'
 python -c 'from mitgcm_surface_tracer.tracer_visualization import main;\
-main("'$RUNDIR/'","'$PDIR/'",\
-    spin_up_time = float("'$RESET'"));\
+main("'$RUNDIR/'","'$PDIR/'");\
 exit();'
