@@ -9,7 +9,7 @@
 if [ "$1" == "dev" ]
 then
   echo "DEV MODE ACTIVE"
-  RUNDIR="/Volumes/EXTERNAL_WORK/run_KOC_daily_LAT"
+  RUNDIR="/Volumes/EXTERNAL_WORK/run_KOC_daily_PSI"
   VALIDPATH="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/OUTPUT/AVISO_validmask/validmask_combined.bin"
 else
   RUNDIR=$PBS_O_WORKDIR

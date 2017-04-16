@@ -99,10 +99,10 @@ class tracer_engine:
         ds.coords['valid_index'] = (['time'], val_idx)
         ds['valid_index'].attrs = {'Description':
                                    'Time mask to eliminate spin up'}
-        ds.coords['reset_index'] = reset_idx
+        ds.coords['reset_index'] = (['time'], reset_idx)
         ds['reset_index'].attrs = {'Description':
                                    'Index of time closest after research'}
-        ds.coords['reset_time'] = reset_ti
+        ds.coords['reset_time'] = (['time'], reset_ti)
         ds['reset_time'].attrs = {'Description':
                                   'exact reset time',
                                   'Units': 'seconds after 1993-1-1 00:00:00'}
