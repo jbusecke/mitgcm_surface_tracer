@@ -50,12 +50,6 @@ main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     spin_up_time = float("'$RESET'"));\
 exit()' > pyout.txt
 
-main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
-    koc_interval=10,\
-    kappa=63,\
-    spin_up_time = float("'$RESET'"));\
-exit()' > pyout.txt
-
 
 echo "PBS PROCESSING SCRIPT DONE"
 qsub PBS_plot
