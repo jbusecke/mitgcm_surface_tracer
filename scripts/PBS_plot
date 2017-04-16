@@ -9,7 +9,7 @@
 if [ "$1" == "dev" ]
 then
   echo "DEV MODE ACTIVE"
-  RUNDIR="/Users/juliusbusecke/Desktop/TimeMachineExcluded/QC_setups/run_debug_checkGradPosition"
+  RUNDIR="/Volumes/EXTERNAL_WORK/run_KOC_daily_LAT"
   # PYTHONDIR="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/ROUTINES/SETUP"
   # PBSDIR=$PYTHONDIR
   VALIDPATH="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/OUTPUT/AVISO_validmask/validmask_combined.bin"
