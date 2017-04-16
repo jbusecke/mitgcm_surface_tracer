@@ -90,7 +90,7 @@ class tracer_engine:
         val_idx, reset_idx, reset_ti = self.reset_cut_mask(ds_mean.iter.data,
                                                            int(tr_num),
                                                            spin_up_months
-                                                           *30*24*60*60)
+                                                           * 30 * 24 * 60 * 60)
 
         ds = xr.Dataset({'KOC': KOC,
                          'Numerator': N,
@@ -98,14 +98,17 @@ class tracer_engine:
                          'AveTracer': RC})
         ds.coords['valid_index'] = (['time'], val_idx)
         ds['valid_index'].attrs = {'Description':
-                                   'Time mask to eliminate spin up'}
-        ds.coords['reset_index'] = (['time'], reset_idx)
-        ds['reset_index'].attrs = {'Description':
-                                   'Index of time closest after research'}
-        ds.coords['reset_time'] = (['time'], reset_ti)
-        ds['reset_time'].attrs = {'Description':
-                                  'exact reset time',
-                                  'Units': 'seconds after 1993-1-1 00:00:00'}
+                                   'Time mask to eliminate spin up',
+                                   'reset_index': reset_idx}
+       # !!! These need to be packaged into the dataset differently
+       # Now they cause additional dimensions...
+        # ds.coords[] = reset_idx
+        # ds['reset_index'].attrs = {'Description':
+        #                            'Index of time closest after reset'}
+        # ds.coords['reset_time'] = reset_ti
+        # ds['reset_time'].attrs = {'Description':
+        #                           'exact reset time',
+        #                           'Units': 'seconds after 1993-1-1 00:00:00'}
         return ds, R
 
     def KOC_combined(self, directory=None, interval=None,
