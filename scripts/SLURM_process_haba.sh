@@ -2,9 +2,9 @@
 
 #SBATCH --account=ocp
 #SBATCH --exclusive
-#SBATCH -N 2
+#SBATCH -N 3
 #SBATCH -J python_proc
-#SBATCH --time=4:00:00
+#SBATCH --time=3:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
 #SBATCH --mail-type=ALL
 
