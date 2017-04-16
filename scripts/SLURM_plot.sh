@@ -28,7 +28,7 @@ PDIR="$RUNDIR/plots"
 rm -r plots
 
 # remake the directory
-mkdir $ODIR
+mkdir $PDIR
 
 echo 'START PYTHON QC PLOTS'
 python -c 'from mitgcm_surface_tracer.tracer_visualization import main;\

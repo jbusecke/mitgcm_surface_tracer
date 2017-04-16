@@ -257,7 +257,7 @@ def main(ddir, pdir, spin_up_time=3):
         spint up time in months, which will be eliminated
     """
     print('### Read in data ###')
-    pdir = dirCheck(pdir, True)
+    # pdir = dirCheck(pdir, True)
     odir = ddir+'/output'
     Tr = tracer_engine(ddir)
     ds_di = Tr.dataset_readin(['tracer_diags'])
