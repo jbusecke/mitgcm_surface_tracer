@@ -39,4 +39,4 @@ exit()' > pyout.txt
 
 
 echo "PBS PROCESSING SCRIPT DONE"
-sbatch SLURM_plot
+sbatch SLURM_plot.sh
