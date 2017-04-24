@@ -397,5 +397,5 @@ def main(ddir, odir, validmaskpath,
     print('SAVE TO FILE')
     start_time = time.time()
     KOC.to_netcdf(odir+'/'+'KOC_FINAL.nc')
-    raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
+    # raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))
