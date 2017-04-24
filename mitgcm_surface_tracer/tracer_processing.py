@@ -373,7 +373,8 @@ def gradient_criterion(grid, q_mean, q_sq_mean):
 
 
 def main(ddir, odir, validmaskpath,
-         koc_interval=20, kappa=63, iters='all', spin_up_time=3):
+         koc_interval=20, kappa=63, iters='all',
+         spin_up_time=3, raw_output=False):
     # spin_up_time in months
 
     # default value for kappa=63
@@ -397,5 +398,6 @@ def main(ddir, odir, validmaskpath,
     print('SAVE TO FILE')
     start_time = time.time()
     KOC.to_netcdf(odir+'/'+'KOC_FINAL.nc')
-    # raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
+    if raw_output:
+        raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))
