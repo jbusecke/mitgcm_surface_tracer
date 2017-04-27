@@ -144,37 +144,42 @@ def reset_cut(reset_frq, reset_pha, dt_model, dt_tracer, iters, cut_time):
             reset_iters -
             reset_time -
     """
-    reset_time = np.array(range(reset_pha,
-                                (iters.max()*dt_model)+dt_model,
-                                reset_frq),
-                          dtype=int)
+    if reset_frq == 0:
+        mask = mask = np.ones_like(iters)
+        reset_iters = np.array([0])
+        reset_time = np.array([0])
+    else:
+        reset_time = np.array(range(reset_pha,
+                                    (iters.max()*dt_model)+dt_model,
+                                    reset_frq),
+                              dtype=int)
 
-    # iteration 0 is always considered a reset
-    if not reset_time[0] == 0:
-        reset_time = np.concatenate((np.array([0]), reset_time))
+        # iteration 0 is always considered a reset
+        if not reset_time[0] == 0:
+            reset_time = np.concatenate((np.array([0]), reset_time))
 
-    # ceil the values if reset times dont divide without remainder
-    # That way for snapshots the reset is evaluating the first snapshot
-    # after the reset and for averages it ensures that the 'reset average'
-    # contains the actual reset time
-    reset_iters = np.ceil(reset_time/float(dt_model))
-    # round iters to nearest tracer iters
-    tracer_iters = float(dt_tracer)/float(dt_model)
-    reset_iters = np.ceil(reset_iters/tracer_iters)*tracer_iters
-    # remove iters that are bigger then iter max
-    while reset_iters[-1] > iters.max():
-        reset_iters = reset_iters[0:-1]
+        # ceil the values if reset times dont divide without remainder
+        # That way for snapshots the reset is evaluating the first snapshot
+        # after the reset and for averages it ensures that the 'reset average'
+        # contains the actual reset time
+        reset_iters = np.ceil(reset_time/float(dt_model))
+        # round iters to nearest tracer iters
+        tracer_iters = float(dt_tracer)/float(dt_model)
+        reset_iters = np.ceil(reset_iters/tracer_iters)*tracer_iters
+        # remove iters that are bigger then iter max
+        while reset_iters[-1] > iters.max():
+            reset_iters = reset_iters[0:-1]
 
-    # translate cut time to iters (round down)
-    cut = np.ceil(cut_time/float(dt_model))
-    mask = np.ones_like(iters)
-    for ii in reset_iters:
-        if cut_time < 0:
-            idx = np.logical_and(iters > (ii+cut), iters <= ii)
-        else:
-            idx = np.logical_and(iters >= ii, iters < (ii+cut))
-        mask[idx] = 0
-    return mask, reset_iters, reset_time
+        # translate cut time to iters (round down)
+        cut = np.ceil(cut_time/float(dt_model))
+        mask = np.ones_like(iters)
+        for ii in reset_iters:
+            if cut_time < 0:
+                idx = np.logical_and(iters > (ii+cut), iters <= ii)
+            else:
+                idx = np.logical_and(iters >= ii, iters < (ii+cut))
+            mask[idx] = 0
+    return mask == 1, reset_iters, reset_time
 
 
 def custom_coarse(a, area, bins, mask):
