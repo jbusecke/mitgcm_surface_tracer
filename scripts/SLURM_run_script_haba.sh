@@ -3,10 +3,12 @@
 #SBATCH --account=ocp
 #SBATCH --exclusive
 #SBATCH -N 6
-#SBATCH -J aviso_surface_tracer
+#SBATCH -J tracer_run
 #SBATCH --time=44:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
 #SBATCH --mail-type=ALL
+
+echo "Running MITgcm in $RUNDIR"
 
 NPROC=128
 
@@ -18,7 +20,11 @@ cd $SLURM_SUBMIT_DIR
 rm *.meta
 rm *.data
 rm STD*
+rm slurm*
+
+# write the tracer source path into file
+ls -l init_tracer.bin > tracersource.txt
 
 mpirun -n $NPROC ./mitgcmuv
 
-sbatch SLURM_video_aviso_surface_tracer_habanero.sh
+sbatch SLURM_process_haba.sh

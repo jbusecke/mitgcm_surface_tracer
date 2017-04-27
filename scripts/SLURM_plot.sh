@@ -22,3 +22,5 @@ source activate standard
 python -c 'from mitgcm_surface_tracer.tracer_visualization import main;\
 main("'$RUNDIR/'","'$PDIR/'");\
 exit();'
+
+sbatch SLURM_video_aviso_surface_tracer_habanero.sh

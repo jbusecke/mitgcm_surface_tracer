@@ -15,10 +15,27 @@ from .utils import readbin, paramReadout, dirCheck
 
 
 class tracer_engine:
-    """Make is easier doing many operations on the same
-    grid."""
+    """ Tracer processing class
+    PARAMETERS
+    ----------
+    ddir : string
+        Path to the mitgcm run directory
+    koc_kappa : float
+        small scale diffusivity ('kappa') used for Osborn-Cox method
+    koc_interval: int
+        Coarse gridding interval, in numer of boxes (e.g. with 0.1 deg
+        resolution '20' yields 2 deg boxes for the output)
+    validmaskpath = string
+        Path to the validmask for the offline velocities
+    makedirs: boolean
+        If true nonexsisting directories are created
 
-    def __init__(self, ddir, koc_kappa=63, koc_interval=20,
+    RETURNS
+    -------
+    Tr : class?
+    """
+
+    def __init__(self, ddir, koc_kappa=63.0, koc_interval=20,
                  validmaskpath=None, makedirs=False):
         # Predefined inputs
         # Start time of offline velocities [YYYY,MM,DD,HH,MM,SS]
@@ -40,100 +57,72 @@ class tracer_engine:
         self.total_iters_model = int(float(
                                      self.modelparameters['data/nTimeSteps']))
 
-    def reset_cut_mask(self, iters, tr_num, cut_time):
-        # +1 to account for iter0
-        # total_iters = self.total_iters_model
-        reset_frq = int(self.modelparameters[
-                            'data.ptracers/PTRACERS_resetFreq('+str(tr_num)+')'
-                            ])
-        reset_pha = int(self.modelparameters[
-            'data.ptracers/PTRACERS_resetPhase('+str(tr_num)+')'])
-        dt_model = self.dt_model
-        dt_tracer = abs(int(float(self.modelparameters[
-            'data.diagnostics/frequency('+str(tr_num)+')'])))
-
-        mask, reset_iters, reset_time = reset_cut(reset_frq, reset_pha,
-                                                  dt_model, dt_tracer,
-                                                  iters, cut_time)
-        return mask, reset_iters, reset_time
-
-    def dataset_readin(self, prefix, directory=None, iters='all'):
-        if directory is None:
-            directory = self.ddir
-        ds = open_mdsdataset(directory, prefix=prefix,
+    def read(self, prefix, ddir=None, iters='all'):
+        """ Read mitgcm input to xarray dataset
+        PARAMETERS
+        ----------
+        prefix : list of string
+            name prefix of mds files to read
+        ddir : string
+            mitgcm output directory
+        iters: see xmitgcm open_mdsdataset for more info
+        """
+        if ddir is None:
+            ddir = self.ddir
+        ds = open_mdsdataset(ddir, prefix=prefix,
                              delta_t=self.dt_model, ref_date=self.ref_date,
                              iters=iters, swap_dims=False)
         return ds
 
-    def KOC(self, tr_num, directory=None, interval=None,
-            spin_up_months=3, iters='all', debug=False):
-
-        if interval is None:
-            interval = self.koc_interval
-
-        ds_mean = self.dataset_readin(['tracer_diags'],
-                                      iters=iters,
-                                      directory=directory)
-        # Right now this is not used. To save time I will deactivate the
-        # snapshot tracer output and put the mean into the routine
-        # ds_snap = self.dataset_readin(['tracer_snapshots'],iters=iters,
-        #                                 directory=directory)
-
-        bins = [('j', self.koc_interval), ('i', self.koc_interval)]
-        KOC, N, D, R, RC = KOC_Full(ds_mean,
-                                    ds_mean,
-                                    self.validmaskpath,
-                                    tr_num,
-                                    bins,
-                                    kappa=self.koc_kappa)
-
-        val_idx, reset_idx, reset_ti = self.reset_cut_mask(ds_mean.iter.data,
-                                                           int(tr_num),
-                                                           spin_up_months
-                                                           * 30 * 24 * 60 * 60)
-
-        ds = xr.Dataset({'KOC': KOC,
-                         'Numerator': N,
-                         'Denominator': D,
-                         'AveTracer': RC})
-        ds.coords['valid_index'] = (['time'], val_idx)
-        ds['valid_index'].attrs = {'Description':
-                                   'Time mask to eliminate spin up',
-                                   'reset_index': reset_idx}
-       # !!! These need to be packaged into the dataset differently
-       # Now they cause additional dimensions...
-        # ds.coords[] = reset_idx
-        # ds['reset_index'].attrs = {'Description':
-        #                            'Index of time closest after reset'}
-        # ds.coords['reset_time'] = reset_ti
-        # ds['reset_time'].attrs = {'Description':
-        #                           'exact reset time',
-        #                           'Units': 'seconds after 1993-1-1 00:00:00'}
-        return ds, R
-
-    def KOC_combined(self, directory=None, interval=None,
-                     spin_up_months=3, iters='all', debug=False):
+    def KOC(self, ddir=None, interval=None,
+            cut_time=7776000, iters='all'):
         """ Calculates the KOC results for all tracer
         Calculates the results for each tracer and merges them together
         Keyword arguments:
         """
 
+        if interval is None:
+            interval = self.koc_interval
+
+        ds_mean = self.read(['tracer_diags'], iters=iters, ddir=ddir)
+
+        ds_snap = self.read(['tracer_snapshots'], iters=iters, ddir=ddir)
+
+        bins = [('j', self.koc_interval), ('i', self.koc_interval)]
+
         pre_combined_ds = []
         pre_combined_R = []
-        for tr in range(len(self.tracernum)):
-            tr_str = '0'+str(tr+1)
-            temp_ds, temp_R = self.KOC(tr_str, directory=directory,
-                                       spin_up_months=spin_up_months,
-                                       iters=iters, interval=interval,
-                                       debug=debug)
+        for tr in self.tracernum:
+            reset_frq = int(self.modelparameters[
+                            'data.ptracers/PTRACERS_resetFreq('+str(tr)+')'
+                            ])
+            reset_pha = int(self.modelparameters[
+                'data.ptracers/PTRACERS_resetPhase('+str(tr)+')'])
+
+            dt_tracer = abs(int(float(self.modelparameters[
+                'data.diagnostics/frequency('+str(tr)+')'])))
+
+            tr_num = '0'+str(tr)
+            temp_ds, temp_R = KOC_Full(ds_snap,
+                                       ds_mean,
+                                       self.validmaskpath,
+                                       str(tr_num),
+                                       bins,
+                                       kappa=self.koc_kappa,
+                                       reset_frq=reset_frq,
+                                       reset_pha=reset_pha,
+                                       dt_model=self.dt_model,
+                                       dt_tracer=dt_tracer,
+                                       cut_time=cut_time,
+                                       ref_date=self.ref_date)
             pre_combined_ds.append(temp_ds)
             pre_combined_R.append(temp_R)
 
-        KOC = xr.concat(pre_combined_ds, 'tracernum')
-        KOC.coords['tracernum'] = (['tracernum'], np.array([1, 2]))
-        rawKOC = xr.concat(pre_combined_R, 'tracernum')
-        rawKOC.coords['tracernum'] = (['tracernum'], np.array([1, 2]))
-        return KOC, rawKOC
+        ds = xr.concat(pre_combined_ds, 'tracernum')
+        ds.coords['tracernum'] = (['tracernum'], self.tracernum)
+        ds_raw = xr.concat(pre_combined_R, 'tracernum')
+        ds_raw.coords['tracernum'] = (['tracernum'], self.tracernum)
+        return ds, ds_raw
 
 
 def reset_cut(reset_frq, reset_pha, dt_model, dt_tracer, iters, cut_time):
@@ -155,37 +144,42 @@ def reset_cut(reset_frq, reset_pha, dt_model, dt_tracer, iters, cut_time):
             reset_iters -
             reset_time -
     """
-    reset_time = np.array(range(reset_pha,
-                                (iters.max()*dt_model)+dt_model,
-                                reset_frq),
-                          dtype=int)
+    if reset_frq == 0:
+        mask = mask = np.ones_like(iters)
+        reset_iters = np.array([0])
+        reset_time = np.array([0])
+    else:
+        reset_time = np.array(range(reset_pha,
+                                    (iters.max()*dt_model)+dt_model,
+                                    reset_frq),
+                              dtype=int)
 
-    # iteration 0 is always considered a reset
-    if not reset_time[0] == 0:
-        reset_time = np.concatenate((np.array([0]), reset_time))
+        # iteration 0 is always considered a reset
+        if not reset_time[0] == 0:
+            reset_time = np.concatenate((np.array([0]), reset_time))
 
-    # ceil the values if reset times dont divide without remainder
-    # That way for snapshots the reset is evaluating the first snapshot
-    # after the reset and for averages it ensures that the 'reset average'
-    # contains the actual reset time
-    reset_iters = np.ceil(reset_time/float(dt_model))
-    # round iters to nearest tracer iters
-    tracer_iters = float(dt_tracer)/float(dt_model)
-    reset_iters = np.ceil(reset_iters/tracer_iters)*tracer_iters
-    # remove iters that are bigger then iter max
-    while reset_iters[-1] > iters.max():
-        reset_iters = reset_iters[0:-1]
+        # ceil the values if reset times dont divide without remainder
+        # That way for snapshots the reset is evaluating the first snapshot
+        # after the reset and for averages it ensures that the 'reset average'
+        # contains the actual reset time
+        reset_iters = np.ceil(reset_time/float(dt_model))
+        # round iters to nearest tracer iters
+        tracer_iters = float(dt_tracer)/float(dt_model)
+        reset_iters = np.ceil(reset_iters/tracer_iters)*tracer_iters
+        # remove iters that are bigger then iter max
+        while reset_iters[-1] > iters.max():
+            reset_iters = reset_iters[0:-1]
 
-    # translate cut time to iters (round down)
-    cut = np.ceil(cut_time/float(dt_model))
-    mask = np.ones_like(iters)
-    for ii in reset_iters:
-        if cut_time < 0:
-            idx = np.logical_and(iters > (ii+cut), iters <= ii)
-        else:
-            idx = np.logical_and(iters >= ii, iters < (ii+cut))
-        mask[idx] = 0
-    return mask, reset_iters, reset_time
+        # translate cut time to iters (round down)
+        cut = np.ceil(cut_time/float(dt_model))
+        mask = np.ones_like(iters)
+        for ii in reset_iters:
+            if cut_time < 0:
+                idx = np.logical_and(iters > (ii+cut), iters <= ii)
+            else:
+                idx = np.logical_and(iters >= ii, iters < (ii+cut))
+            mask[idx] = 0
+    return mask == 1, reset_iters, reset_time
 
 
 def custom_coarse(a, area, bins, mask):
@@ -194,15 +188,35 @@ def custom_coarse(a, area, bins, mask):
     return a_coarse
 
 
-def KOC_Full(snap, mean, validfile, tr_num, bins, kappa=63,
-             debug=False, method='LT'):
+def check_KOC_input(mean, snap, tr_num, method):
+    required_fields = ['DXSqTr'+tr_num, 'DYSqTr'+tr_num, 'TRAC'+tr_num]
+
+    if method == 'L':
+        if not np.array([a in snap.keys() for a in required_fields]).all():
+            raise RuntimeError(['mean dataset does not have required \
+                                   variables (']+snap.keys()+[')'])
+    elif method == 'T' or method == 'LT':
+        if not np.array([a in mean.keys() for a in required_fields]).all():
+            raise RuntimeError(['mean dataset does not have required \
+                                   variables (']+mean.keys()+[')'])
+
+
+def KOC_Full(snap, mean, validfile, tr_num, bins,
+             kappa=63,
+             method='LT',
+             reset_frq=None,
+             reset_pha=None,
+             dt_model=None,
+             dt_tracer=None,
+             cut_time=7776000,
+             ref_date='No date',
+             debug=False):
+
     # !!! totally hacky...this needs to be replaced.
     axis_bins = [('X', bins[0][1]), ('Y', bins[0][1])]
-    #
     area = mean.rA
     area_sum = aggregate(area, bins, func=np.sum)
-    # Masking #
-    # landmask
+
     landmask_w = mean.hFacW.data != 0
     landmask_s = mean.hFacS.data != 0
     landmask_c = mean.hFacC != 0
@@ -214,40 +228,7 @@ def KOC_Full(snap, mean, validfile, tr_num, bins, kappa=63,
 
     mask = np.logical_and(validmask, landmask)
 
-    # Correct the false grid dimensions for the diagnoses output
-    # !!! the uvel dims are taken...if there is no data var 'UVEL' or 'VVEL'
-    # This will fail..it should be removed in the future
-
-    if 'i' in mean['DXSqTr'+tr_num].dims:
-        mean['DXSqTr'+tr_num] = xr.DataArray(mean['DXSqTr'+tr_num].data,
-                                             dims=mean.UVEL.dims,
-                                             coords=mean.UVEL.coords)
-
-    if 'j' in mean['DYSqTr'+tr_num].dims:
-        mean['DYSqTr'+tr_num] = xr.DataArray(mean['DYSqTr'+tr_num].data,
-                                             dims=mean.VVEL.dims,
-                                             coords=mean.VVEL.coords)
-    if 'DXSqTr'+tr_num in snap.data_vars.keys():
-        if 'i' in snap['DXSqTr'+tr_num].dims:
-            snap['DXSqTr'+tr_num] = xr.DataArray(snap['DXSqTr'+tr_num].data,
-                                                 dims=snap.UVEL.dims,
-                                                 coords=snap.UVEL.coords)
-    if 'DYSqTr'+tr_num in snap.data_vars.keys():
-        if 'j' in snap['DYSqTr'+tr_num].dims:
-            snap['DYSqTr'+tr_num] = xr.DataArray(snap['DYSqTr'+tr_num].data,
-                                                 dims=snap.VVEL.dims,
-                                                 coords=snap.VVEL.coords)
-
-    required_fields = ['DXSqTr'+tr_num, 'DYSqTr'+tr_num, 'TRAC'+tr_num]
-
-    if method == 'L':
-        if not np.array([a in snap.keys() for a in required_fields]).all():
-            raise RuntimeError(['mean dataset does not have all required \
-                                   variables (']+snap.keys()+[')'])
-    elif method == 'T' or method == 'LT':
-        if not np.array([a in mean.keys() for a in required_fields]).all():
-            raise RuntimeError(['mean dataset does not have all required \
-                                   variables (']+mean.keys()+[')'])
+    check_KOC_input(mean, snap, tr_num, method)
 
     # snapshots averaged in space
     if method == 'L':
@@ -344,10 +325,41 @@ def KOC_Full(snap, mean, validfile, tr_num, bins, kappa=63,
     raw.coords['validmask'] = validmask
     raw.coords['mask'] = mask
 
-    return koc, n, d, raw, raw_coarse
+    ds = xr.Dataset({'KOC': koc,
+                     'Numerator': n,
+                     'Denominator': d,
+                     'AveTracer': raw_coarse})
+    # Add attributes to ds
+    ds.KOC.attrs['long_name'] = 'Osborn-Cox Diffusivity'
+    ds.AveTracer.attrs['long_name'] = 'Coarsened Tracer'
+    ds.Numerator.attrs['long_name'] = 'Mixing Enhancement'
+    ds.Denominator.attrs['long_name'] = 'Background Mixing'
+    raw.validmask.attrs['long_name'] = 'Mask for valid Aviso data points'
+    raw.landmask.attrs['long_name'] = 'Land mask'
+    raw.mask.attrs['long_name'] = 'combination of land and validmask'
+    ds.mask_count.attrs['long_name'] = 'number of ocean data points before \
+                                        coarsening'
+
+    # Determine reset properties
+    val_idx, _, _ = reset_cut(reset_frq,
+                              reset_pha,
+                              dt_model,
+                              dt_tracer,
+                              mean.iter.data,
+                              cut_time)
+
+    ds.coords['valid_index'] = (['time'], val_idx)
+    ds['valid_index'].attrs = {'Description':
+                               'Mask eliminating spin up'}
+    return ds, raw
 
 
 def gradient_criterion(grid, q_mean, q_sq_mean):
+    """Calculates the validity criterion of the Osborn-Cox method.
+    cr  = l_mix/l_curv = (c'_rms*nabla^2 overbar(c))/(2*|grad(overbar(c))|^2)
+    equivalent to cr = D/sqrt(phi_2) from Olbers et al. Ocean Dynamics
+
+    """
     lap_q = laplacian(grid, q_mean)
     grad_q = gradient_sq_amplitude(grid, q_mean)
     q_prime_sq_mean = q_sq_mean-(q_mean**2)
@@ -359,14 +371,15 @@ def gradient_criterion(grid, q_mean, q_sq_mean):
     # - swap_dims needs to be deactivated in xmitgcm/open_mdsdataset
     return {'crit': crit,
             'lap_q': lap_q,
-            'grad_q': grad_q,
+            'sq_abs_grad_q': grad_q,
             'q_prime_sq_mean': q_prime_sq_mean,
             'phi': phi,
             'D': D}
 
 
 def main(ddir, odir, validmaskpath,
-         koc_interval=20, kappa=63, iters='all', spin_up_time=3):
+         koc_interval=20, kappa=63, iters='all',
+         spin_up_time=3, raw_output=False):
     # spin_up_time in months
 
     # default value for kappa=63
@@ -383,11 +396,13 @@ def main(ddir, odir, validmaskpath,
 
     print('CALCULATE OSBORN-COX DIFFUSIVITY')
     start_time = time.time()
-    KOC, raw = TrCore.KOC_combined(spin_up_months=spin_up_time, iters=iters)
+    cut_time = spin_up_time * 30 * 24 * 60 * 60
+    KOC, raw = TrCore.KOC(cut_time=cut_time, iters='all')
     print("--- %s seconds ---" % (time.time() - start_time))
 
     print('SAVE TO FILE')
     start_time = time.time()
     KOC.to_netcdf(odir+'/'+'KOC_FINAL.nc')
-    raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
+    if raw_output:
+        raw.to_netcdf(odir+'/'+'KOC_RAW.nc')
     print("--- %s seconds ---" % (time.time() - start_time))

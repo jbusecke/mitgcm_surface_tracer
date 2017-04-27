@@ -5,7 +5,6 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from .tracer_processing import tracer_engine
-from .utils import dirCheck
 
 
 def QC_reset_plot(ds_di, ds_sn, tr_engine, cut_time, tr_num, ylim=None):
@@ -257,7 +256,6 @@ def main(ddir, pdir, spin_up_time=3):
         spint up time in months, which will be eliminated
     """
     print('### Read in data ###')
-    # pdir = dirCheck(pdir, True)
     odir = ddir+'/output'
     Tr = tracer_engine(ddir)
     ds_di = Tr.dataset_readin(['tracer_diags'])

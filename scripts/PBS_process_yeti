@@ -9,7 +9,8 @@
 if [ "$1" == "dev" ]
 then
   echo "DEV MODE ACTIVE"
-  RUNDIR="/Volumes/EXTERNAL_WORK/run_KOC_daily_PSI"
+  # RUNDIR="/Volumes/EXTERNAL_WORK/run_KOC_daily_PSI"
+  RUNDIR="/Users/juliusbusecke/Desktop/TimeMachineExcluded/QC_setups/run_debug_checkGradPosition"
   VALIDPATH="/Users/juliusbusecke/Work/PROJECTS/COLL_RYAN/OUTPUT/AVISO_validmask/validmask_combined.bin"
 else
   RUNDIR=$PBS_O_WORKDIR
@@ -42,7 +43,6 @@ fi
 mkdir $ODIR
 
 echo 'START PYTHON READOUT'
-echo 'Test new version'
 python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
 main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     koc_interval=10,\

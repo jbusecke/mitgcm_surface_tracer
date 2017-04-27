@@ -2,9 +2,9 @@
 
 #SBATCH --account=ocp
 #SBATCH --exclusive
-#SBATCH -N 4
-#SBATCH -J python_proc
-#SBATCH --time=2:00:00
+#SBATCH -N 8
+#SBATCH -J tr_proc
+#SBATCH --time=3:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
 #SBATCH --mail-type=ALL
 
@@ -39,4 +39,4 @@ exit()' > pyout.txt
 
 
 echo "PBS PROCESSING SCRIPT DONE"
-sbatch SLURM_plot
+sbatch SLURM_plot.sh
