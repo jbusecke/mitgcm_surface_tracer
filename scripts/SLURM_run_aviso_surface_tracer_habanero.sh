@@ -4,7 +4,7 @@
 #SBATCH --exclusive
 #SBATCH -N 6
 #SBATCH -J aviso_surface_tracer
-#SBATCH --time=18:00:00
+#SBATCH --time=44:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
 #SBATCH --mail-type=ALL
 
