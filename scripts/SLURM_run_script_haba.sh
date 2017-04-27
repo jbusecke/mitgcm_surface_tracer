@@ -3,7 +3,7 @@
 #SBATCH --account=ocp
 #SBATCH --exclusive
 #SBATCH -N 6
-#SBATCH -J tracer_run
+#SBATCH -J tr_run
 #SBATCH --time=44:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
 #SBATCH --mail-type=ALL
