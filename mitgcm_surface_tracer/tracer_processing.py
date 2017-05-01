@@ -84,9 +84,12 @@ class tracer_engine:
         if interval is None:
             interval = self.koc_interval
 
-        ds_mean = self.read(['tracer_diags'], iters=iters, ddir=ddir)
+        # The conversion to np.float64, does it help with the spikes?
+        ds_mean = self.read(
+            ['tracer_diags'], iters=iters, ddir=ddir).astype(np.float64)
 
-        ds_snap = self.read(['tracer_snapshots'], iters=iters, ddir=ddir)
+        ds_snap = self.read(
+            ['tracer_snapshots'], iters=iters, ddir=ddir).astype(np.float64)
 
         bins = [('j', self.koc_interval), ('i', self.koc_interval)]
 
@@ -353,23 +356,17 @@ def gradient_criterion(grid, q_mean, q_sq_mean):
     """Calculates the validity criterion of the Osborn-Cox method.
     cr  = l_mix/l_curv = (c'_rms*nabla^2 overbar(c))/(2*|grad(overbar(c))|^2)
     equivalent to cr = D/sqrt(phi_2) from Olbers et al. Ocean Dynamics
-
     """
     lap_q = laplacian(grid, q_mean)
-    grad_q = gradient_sq_amplitude(grid, q_mean)
+    grad_q_sq = gradient_sq_amplitude(grid, q_mean)
     q_prime_sq_mean = q_sq_mean-(q_mean**2)
-    # Perhaps this needs to padded with zeros where q_prime_sq_mean<0
-    phi = q_prime_sq_mean.where(q_prime_sq_mean > 0)/2
-    D = abs(lap_q)/grad_q
-    crit = D*np.sqrt(phi)
-    # Notes
-    # - swap_dims needs to be deactivated in xmitgcm/open_mdsdataset
+    c_rms = xr.ufuncs.sqrt(q_prime_sq_mean.where(q_prime_sq_mean > 0)/2)
+    crit = c_rms*lap_q/grad_q_sq
     return {'crit': crit,
             'lap_q': lap_q,
-            'sq_abs_grad_q': grad_q,
+            'sq_abs_grad_q': grad_q_sq,
             'q_prime_sq_mean': q_prime_sq_mean,
-            'phi': phi,
-            'D': D}
+            'c_rms': c_rms}
 
 
 def main(ddir, odir, validmaskpath,
