@@ -281,11 +281,16 @@ def KOC_Full(snap, mean, validfile, tr_num, bins,
     crit_q_mean = custom_coarse(data['TRAC'+tr_num], area, bins, mask)
     crit_q_sq_mean = custom_coarse(data['TRACSQ'+tr_num], area, bins, mask)
     crit_dict = gradient_criterion(grid_coarse, crit_q_mean, crit_q_sq_mean)
-    crit = crit_dict['crit']
 
     # Export the 'raw tracer fields' ###
     raw = data['TRAC'+tr_num]
     raw_coarse = custom_coarse(raw, area, bins, mask)
+    raw.coords['landmask'] = landmask
+    raw.coords['validmask'] = validmask
+    raw.coords['mask'] = mask
+    raw.validmask.attrs['long_name'] = 'Mask for valid Aviso data points'
+    raw.landmask.attrs['long_name'] = 'Land mask'
+    raw.mask.attrs['long_name'] = 'combination of land and validmask'
 
     # Final edits for output
     koc = n/d*kappa
@@ -304,37 +309,26 @@ def KOC_Full(snap, mean, validfile, tr_num, bins,
     koc = xr.DataArray(koc.data, coords=co, dims=koc.dims)
     raw_coarse = xr.DataArray(raw_coarse.data, coords=co, dims=raw_coarse.dims)
 
-    d.coords['area'] = area_sum
-    n.coords['area'] = area_sum
-    koc.coords['area'] = area_sum
-    raw_coarse.coords['area'] = area_sum
-
-    d.coords['mask_count'] = mask_count
-    n.coords['mask_count'] = mask_count
-    koc.coords['mask_count'] = mask_count
-    raw_coarse.coords['mask_count'] = mask_count
-
-    d.coords['gradient_criterion'] = crit
-    n.coords['gradient_criterion'] = crit
-    koc.coords['gradient_criterion'] = crit
-    raw_coarse.coords['gradient_criterion'] = crit
-
-    raw.coords['landmask'] = landmask
-    raw.coords['validmask'] = validmask
-    raw.coords['mask'] = mask
-
     ds = xr.Dataset({'KOC': koc,
                      'Numerator': n,
                      'Denominator': d,
-                     'AveTracer': raw_coarse})
+                     'AveTracer': raw_coarse,
+                     'RMSTracer': crit_dict['q_rms'],
+                     'GradTracer': crit_dict['q_grad_abs'],
+                     'gradient_criterion': crit_dict['crit']})
+
+    ds.coords['mask_count'] = mask_count
+    ds.coords['area'] = area_sum
+
     # Add attributes to ds
     ds.KOC.attrs['long_name'] = 'Osborn-Cox Diffusivity'
     ds.AveTracer.attrs['long_name'] = 'Coarsened Tracer'
+    ds.RMSTracer.attrs['long_name'] = 'Coarsened Tracer Variance'
+    ds.GradTracer.attrs['long_name'] = 'Coarsened Tracer Gradient (absolute)'
+    ds.gradient_criterion.attrs['long_name'] = \
+        'Gradient Criterion'
     ds.Numerator.attrs['long_name'] = 'Mixing Enhancement'
     ds.Denominator.attrs['long_name'] = 'Background Mixing'
-    raw.validmask.attrs['long_name'] = 'Mask for valid Aviso data points'
-    raw.landmask.attrs['long_name'] = 'Land mask'
-    raw.mask.attrs['long_name'] = 'combination of land and validmask'
     ds.mask_count.attrs['long_name'] = 'number of ocean data points before \
                                         coarsening'
 
@@ -348,7 +342,7 @@ def KOC_Full(snap, mean, validfile, tr_num, bins,
 
     ds.coords['valid_index'] = (['time'], val_idx)
     ds['valid_index'].attrs = {'Description':
-                               'Mask eliminating spin up'}
+                               'Time mask eliminating spin up'}
     return ds, raw
 
 
@@ -358,15 +352,14 @@ def gradient_criterion(grid, q_mean, q_sq_mean):
     equivalent to cr = D/sqrt(phi_2) from Olbers et al. Ocean Dynamics
     """
     lap_q = laplacian(grid, q_mean)
-    grad_q_sq = gradient_sq_amplitude(grid, q_mean)
+    q_grad_abs_sq = gradient_sq_amplitude(grid, q_mean)
     q_prime_sq_mean = q_sq_mean-(q_mean**2)
-    c_rms = xr.ufuncs.sqrt(q_prime_sq_mean.where(q_prime_sq_mean > 0)/2)
-    crit = c_rms*lap_q/grad_q_sq
+    q_rms = xr.ufuncs.sqrt(q_prime_sq_mean.where(q_prime_sq_mean > 0)/2)
+    crit = q_rms*abs(lap_q)/q_grad_abs_sq
     return {'crit': crit,
-            'lap_q': lap_q,
-            'sq_abs_grad_q': grad_q_sq,
-            'q_prime_sq_mean': q_prime_sq_mean,
-            'c_rms': c_rms}
+            'q_laplacian': lap_q,
+            'q_grad_abs': xr.ufuncs.sqrt(q_grad_abs_sq),
+            'q_rms': q_rms}
 
 
 def main(ddir, odir, validmaskpath,
