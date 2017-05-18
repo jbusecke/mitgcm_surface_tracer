@@ -2,7 +2,7 @@
 
 #SBATCH --account=ocp
 #SBATCH --exclusive
-#SBATCH -N 8
+#SBATCH -N 4
 #SBATCH -J tr_proc
 #SBATCH --time=3:00:00
 #SBATCH --mail-user=julius@ldeo.columbia.edu
