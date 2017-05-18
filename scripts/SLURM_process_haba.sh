@@ -34,6 +34,7 @@ python -c 'from mitgcm_surface_tracer.tracer_processing import main;\
 main("'$RUNDIR/'","'$ODIR/'","'$VALIDPATH'",\
     koc_interval=10,\
     kappa=63,\
+    raw_output=True,\
     spin_up_time = float("'$RESET'"));\
 exit()' > pyout.txt
 
