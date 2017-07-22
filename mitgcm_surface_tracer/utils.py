@@ -11,6 +11,12 @@ def writebin(a, file):
     a.astype(dtype=np.dtype('float32').newbyteorder('>')).tofile(f)
 
 
+def writetxt(string, filepath):
+    f = open(filepath, 'w')
+    f.write(string)
+    f.close()
+
+
 def readbin(file, shape):
     '''Reads MITgcm bin input files
     file = filepath to the bin
@@ -20,6 +26,8 @@ def readbin(file, shape):
     a = np.fromfile(f, dtype=np.dtype('float32').newbyteorder('>'))
     a = a.reshape(shape)
     return a
+
+# def readtxt(str, file):
 
 
 def paramReadout(directory):
