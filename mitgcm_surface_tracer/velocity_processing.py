@@ -55,7 +55,6 @@ def merge_aviso(ddir_dt,
 
     # Test if time is continous
     if np.any(ds.time.diff('time').data != ds.time.diff('time')[0].data):
-        print(ds.time)
         raise RuntimeError('Time steps are not homogeneous. Likely missing \
         files between the dt and nrt products')
 
@@ -75,7 +74,6 @@ def interpolated_aviso_validmask(da, xi, yi):
 
 def block_interpolate(array, x, y, xi, yi):
     a = interp_map_regular_grid(np.squeeze(array), x, y, xi, yi)
-    print(a)
     return a[np.newaxis, :, :]
 
 
