@@ -2,13 +2,21 @@ import numpy as np
 import os
 
 
-def writebin(a, file):
+def writebin(a, filepath, verbose=False):
     '''Reads MITgcm bin input files
     a = np.array to save
     file = filepath
     '''
-    f = open(file, 'w')
+    f = open(filepath, 'w')
     a.astype(dtype=np.dtype('float32').newbyteorder('>')).tofile(f)
+    print('--- Written to '+filepath+' ---')
+
+
+def writetxt(string, filepath, verbose=False):
+    f = open(filepath, 'w')
+    f.write(string)
+    f.close()
+    print('--- Written to '+filepath+' ---')
 
 
 def readbin(file, shape):
@@ -20,6 +28,8 @@ def readbin(file, shape):
     a = np.fromfile(f, dtype=np.dtype('float32').newbyteorder('>'))
     a = a.reshape(shape)
     return a
+
+# def readtxt(str, file):
 
 
 def paramReadout(directory):
