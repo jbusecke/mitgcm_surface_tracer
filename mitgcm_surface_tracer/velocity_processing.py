@@ -1,7 +1,7 @@
 from __future__ import print_function
 import xarray as xr
 import numpy as np
-import time
+# import time
 import os
 import os.path
 from xmitgcm import open_mdsdataset
@@ -51,7 +51,7 @@ def merge_aviso(ddir_dt,
                        dim='time')
     else:
         ds = ds_dt
-        transition_date = ''
+        transition_date = None
 
     # Test if time is continous
     if np.any(ds.time.diff('time').data != ds.time.diff('time')[0].data):
@@ -60,6 +60,7 @@ def merge_aviso(ddir_dt,
         files between the dt and nrt products')
 
     start_date = ds.time[0].data
+    ds = ds.chunk({'time': 1})
 
     return ds, start_date, transition_date
 
@@ -99,9 +100,13 @@ def interpolate_write(ds, xi, yi, filename=''):
 
 
 def process_aviso(odir,
-                  gdir,
                   ddir_dt,
+                  xc=None,
+                  xg=None,
+                  yc=None,
+                  yg=None,
                   fid_dt='dt_global_allsat_msla_uv_*.nc',
+                  gdir=None,
                   ddir_nrt=None,
                   fid_nrt='nrt_global_allsat_msla_uv_*.nc',
                   debug=True):
@@ -128,47 +133,53 @@ def process_aviso(odir,
         string pattern identifying near-real time products
         (default:nrt_global_allsat_msla_uv_*.nc')
     """
+
+    if gdir is None:
+        if any([x is None for x in [xg, yg, xc, yc]]):
+            raise RuntimeError('if grid dir is not specified all interpolation\
+            coordinates have to be supplied as input')
+        XC = xc
+        XG = xg
+        YC = yc
+        YG = yg
+    else:
+        if any([x is not None for x in [xg, yg, xc, yc]]):
+            raise RuntimeError('if grid dir is supplied, interpolation\
+             coordinates can not be specified')
+
+        grid = open_mdsdataset(gdir, iters=None)
+        XC = grid.XC.data
+        XG = grid.XG.data
+        YC = grid.YC.data
+        YG = grid.YG.data
+
     ds, start_date, transition_date = merge_aviso(ddir_dt,
                                                   fid_dt=fid_dt,
                                                   ddir_nrt=ddir_nrt,
                                                   fid_nrt=fid_nrt)
 
-    # Write out the startdate and transition_date to textfile
-    writetxt(str(start_date), odir+'/startdate.txt')
-    print('--- startdate written to '+odir+'/startdate.txt ---')
+    print('Startdate:'+str(start_date))
+    writetxt(str(start_date), odir+'/startdate.txt', verbose=True)
 
-    writetxt(str(transition_date), odir+'/transitiondate.txt.txt')
-    print('--- transition date written to '+odir+'/startdate.txt ---')
-
-    grid = open_mdsdataset(gdir, iters=None)
-    XC = grid.XC.data
-    XG = grid.XG.data
-    YC = grid.YC.data
-    YG = grid.YG.data
+    print('Near-real-time Transition:'+str(transition_date))
+    writetxt(str(transition_date), odir+'/transitiondate.txt', verbose=True)
 
     # create and save validmask
     # validmask indicates values that were interpolated or filled
     # and should be taken out for certain interpretations.
     validmask_aviso_u = interpolated_aviso_validmask(ds.u, XG, YC)
     validmask_aviso_v = interpolated_aviso_validmask(ds.v, XC, YG)
-
     validmask = np.logical_and(validmask_aviso_u, validmask_aviso_v)
 
-    writebin(validmask, odir+'/validmask.bin')
-    print('--- validmask written to '+odir+'/validmask.bin ---')
+    print ('Validmask')
+    writebin(validmask, odir+'/validmask.bin', verbose=True)
 
-    #  Velocities near the coast are padded with zeros
+    #  Velocities near the coast are padded with zeros and then interpolated
     ds = ds.fillna(0)
-
-    # interpolate velocities
     u_interpolated = interpolate_write(ds.u, XG, YC, filename=odir+'/uvel')
-
     v_interpolated = interpolate_write(ds.v, XC, YG, filename=odir+'/vvel')
 
-    if xr.ufuncs.isnan(u_interpolated).any().compute():
-        raise RuntimeError('Nans detected in the u fields')
-    if xr.ufuncs.isnan(v_interpolated).any().compute():
-        raise RuntimeError('Nans detected in the v fields')
+    return u_interpolated, v_interpolated
 
 
 def combine_validmask(data_dir, shape=None, debug=False):
