@@ -128,44 +128,6 @@ def test_interpolated_aviso_validmask(vel_dir):
     assert_allclose(mask_expected, mask)
 
 
-# def test_interpolate_write(vel_dir):
-#     fname = str(vel_dir)+'/write_test'
-#     ds = xr.open_mfdataset(str(vel_dir.join('dt_*.nc')))
-#     data = ds.u
-#     xi = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
-#     yi = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
-#
-#     fname = str(vel_dir)+'/write_test'
-#     interpolate_write(data, xi, yi, filename=fname)
-#
-#     fname_padded = str(vel_dir)+'/write_test_padded'
-#     interpolate_write(data.fillna(0), xi, yi,
-#                       filename=fname_padded)
-#
-#     interpolated_control = np.array([
-#         [[0., 0.5, 1.],
-#          [0.33333333, 0.66666667, 1.],
-#          [0.66666667,  0.83333333,  1.],
-#          [1., 1., 1.]],
-#
-#         [[0., 1., 2.],
-#          [0.66666667, 1.33333333, 2.],
-#          [1.33333333, 1.66666667, 2.],
-#          [2., 2., 2.]],
-#
-#         [[0., 1.5, 3.],
-#          [1., 2., 3.],
-#          [2., 2.5, 3.],
-#          [3., 3., 3.]]
-#         ])
-#     for tt in range(len(data.time)):
-#         assert_allclose(readbin(fname+'%04i' % tt, [4, 3]),
-#                         np.ones_like(interpolated_control[tt, :, :])*np.nan)
-#
-#         assert_allclose(readbin(fname_padded+'%04i' % tt, [4, 3]),
-#                         interpolated_control[tt, :, :])
-
-
 def test_process_aviso(vel_dir):
     ds = xr.open_mfdataset(str(vel_dir.join('dt_*.nc')))
     data = ds.u
@@ -174,6 +136,7 @@ def test_process_aviso(vel_dir):
     yc = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
     xg = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
     yg = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
+
     odir = vel_dir.strpath
     ddir = vel_dir.strpath
 
