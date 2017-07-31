@@ -71,10 +71,10 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
                                           chunks=(1, len(YC), len(XG)))
 
     u_interpolated = xr.DataArray(u_interpolated,
-                                  dims=['time', 'lon', 'lat'],
+                                  dims=['time', 'lat', 'lon'],
                                   coords={'time': ds.time,
-                                          'lon': XG,
-                                          'lat': YC
+                                          'lat': YC,
+                                          'lon': XG
                                           })
 
     v_interpolated = ds.v.data.map_blocks(block_interpolate, x, y, XC, YG,
@@ -82,10 +82,10 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
                                           chunks=(1, len(YG), len(XC)))
 
     v_interpolated = xr.DataArray(v_interpolated,
-                                  dims=['time', 'lon', 'lat'],
+                                  dims=['time', 'lat', 'lon'],
                                   coords={'time': ds.time,
-                                          'lon': XG,
-                                          'lat': YC
+                                          'lat': YG,
+                                          'lon': XC
                                           })
 
     ds_interpolated = xr.Dataset({'u': u_interpolated,
