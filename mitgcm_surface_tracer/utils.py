@@ -19,6 +19,26 @@ def writetxt(string, filepath, verbose=False):
     print('--- Written to '+filepath+' ---')
 
 
+class writable_mds_store:
+    '''adapted from @rabernat aviso processing notebooks'''
+    def __init__(self, prefix, iters, suffix='data', dtype='>f4'):
+        self.prefix = prefix
+        self.iters = iters
+        self.suffix = suffix
+        self.dtype = dtype
+
+    def __setitem__(self, idx, data):
+        # first slice should be the time index
+        tslice = idx[0]
+        # make sure it is just one single time slice
+        assert tslice.step is None
+        assert (tslice.stop - tslice.start) == 1
+        n = tslice.start
+        fname = '%s.%010d.%s' % (self.prefix, self.iters[n], self.suffix)
+        # print("Writing %s" % fname)
+        data.astype(self.dtype).tofile(fname)
+
+
 def readbin(file, shape):
     '''Reads MITgcm bin input files
     file = filepath to the bin

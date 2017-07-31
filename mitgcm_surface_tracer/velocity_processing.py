@@ -6,62 +6,9 @@ import os
 import os.path
 from xmitgcm import open_mdsdataset
 from xarrayutils.numpy_utils import interp_map_regular_grid
-from .utils import readbin, writebin, writetxt
+from .utils import readbin, writebin, writetxt, writable_mds_store
 from dask.diagnostics import ProgressBar
-
-
-def merge_aviso(ddir_dt,
-                fid_dt='dt_global_allsat_msla_uv_*.nc',
-                ddir_nrt=None,
-                fid_nrt='nrt_global_allsat_msla_uv_*.nc'):
-
-    """read aviso files into xarray dataset
-    This function merges delayed-time and near-real time products if optional
-    near-real time parameters are given.
-
-    PARAMETERS
-    ----------
-    ddir_dt : path
-        data directory for delayed time product
-    fid_dt : str
-        string pattern identifying delayed time products
-        (default:'dt_global_allsat_msla_uv_*.nc')
-    ddir_dt : path
-        data directory for near-real time product
-        (default: None)
-    fid_dt : str
-        string pattern identifying near-real time products
-        (default:nrt_global_allsat_msla_uv_*.nc')
-
-    RETURNS
-    -------
-    ds : xarray.Dataset
-        combined Aviso dataset
-    start_date : datetime
-        date of first aviso data
-    transition_date : datetime
-        date when data switches from delayed-time and near-real time
-    """
-    ds_dt = xr.open_mfdataset(ddir_dt+'/'+fid_dt).sortby('time')
-    if ddir_nrt is not None:
-        transition_date = ds_dt.time.isel(time=-1)
-        ds_nrt = xr.open_mfdataset(ddir_nrt+'/'+fid_nrt).sortby('time')
-        ds = xr.concat((ds_dt,
-                        ds_nrt.isel(time=ds_nrt.time > transition_date)),
-                       dim='time')
-    else:
-        ds = ds_dt
-        transition_date = None
-
-    # Test if time is continous
-    if np.any(ds.time.diff('time').data != ds.time.diff('time')[0].data):
-        raise RuntimeError('Time steps are not homogeneous. Likely missing \
-        files between the dt and nrt products')
-
-    start_date = ds.time[0].data
-    ds = ds.chunk({'time': 1})
-
-    return ds, start_date, transition_date
+from aviso_products.aviso_processing import merge_aviso
 
 
 def interpolated_aviso_validmask(da, xi, yi):
@@ -77,26 +24,6 @@ def block_interpolate(array, x, y, xi, yi):
     return a[np.newaxis, :, :]
 
 
-def block_write(array, filename='', block_id=None):
-    writebin(array, filename + '%04i' % block_id[0])
-    return np.array([1])
-
-
-def interpolate_write(ds, xi, yi, filename=''):
-    x = ds.lon.data
-    y = ds.lat.data
-    interpolated = ds.data.map_blocks(block_interpolate, x, y, xi, yi,
-                                      dtype=np.float64,
-                                      chunks=(1, len(yi), len(xi)))
-    print('Writing interpolated data to file')
-    with ProgressBar():
-        interpolated.map_blocks(block_write,
-                                filename=filename,
-                                dtype=np.float64,
-                                chunks=[1], drop_axis=[1, 2]).compute()
-    return interpolated
-
-
 def process_aviso(odir,
                   ddir_dt,
                   xc=None,
@@ -107,7 +34,9 @@ def process_aviso(odir,
                   gdir=None,
                   ddir_nrt=None,
                   fid_nrt='nrt_global_allsat_msla_uv_*.nc',
-                  debug=True):
+                  debug=True,
+                  verbose=True,
+                  mkdir=False):
 
     """read aviso files into xarray dataset, respecting 'seam' between
     delayed-time
@@ -131,6 +60,9 @@ def process_aviso(odir,
         string pattern identifying near-real time products
         (default:nrt_global_allsat_msla_uv_*.nc')
     """
+    if mkdir:
+        if not os.path.exists(odir):
+            os.mkdir(odir)
 
     if gdir is None:
         if any([x is None for x in [xg, yg, xc, yc]]):
@@ -155,12 +87,13 @@ def process_aviso(odir,
                                                   fid_dt=fid_dt,
                                                   ddir_nrt=ddir_nrt,
                                                   fid_nrt=fid_nrt)
+    if verbose:
+        print('Startdate:'+str(start_date))
+    writetxt(str(start_date), odir+'/startdate.txt', verbose=verbose)
 
-    print('Startdate:'+str(start_date))
-    writetxt(str(start_date), odir+'/startdate.txt', verbose=True)
-
-    print('Near-real-time Transition:'+str(transition_date))
-    writetxt(str(transition_date), odir+'/transitiondate.txt', verbose=True)
+    if verbose:
+        print('Near-real-time Transition:'+str(transition_date))
+    writetxt(str(transition_date), odir+'/transitiondate.txt', verbose=verbose)
 
     # create and save validmask
     # validmask indicates values that were interpolated or filled
@@ -169,13 +102,36 @@ def process_aviso(odir,
     validmask_aviso_v = interpolated_aviso_validmask(ds.v, XC, YG)
     validmask = np.logical_and(validmask_aviso_u, validmask_aviso_v)
 
-    print ('Validmask')
-    writebin(validmask, odir+'/validmask.bin', verbose=True)
+    if verbose:
+        print ('Validmask')
+    writebin(validmask, odir+'/validmask.bin', verbose=verbose)
 
     #  Velocities near the coast are padded with zeros and then interpolated
     ds = ds.fillna(0)
-    u_interpolated = interpolate_write(ds.u, XG, YC, filename=odir+'/uvel')
-    v_interpolated = interpolate_write(ds.v, XC, YG, filename=odir+'/vvel')
+
+    x = ds.lon.data
+    y = ds.lat.data
+
+    u_interpolated = ds.u.data.map_blocks(block_interpolate, x, y, XG, YC,
+                                          dtype=np.float64,
+                                          chunks=(1, len(YC), len(XG)))
+
+    v_interpolated = ds.v.data.map_blocks(block_interpolate, x, y, XC, YG,
+                                          dtype=np.float64,
+                                          chunks=(1, len(YG), len(XC)))
+    iters = range(len(ds.time.data))
+    uvel_store = writable_mds_store(os.path.join(odir, 'uvelCorr'), iters)
+    vvel_store = writable_mds_store(os.path.join(odir, 'vvelCorr'), iters)
+
+    if verbose:
+        print('Writing interpolated u velocities to ' + odir + 'uvel')
+    with ProgressBar():
+        u_interpolated.store(uvel_store)
+
+    if verbose:
+        print('Writing interpolated v velocities to ' + odir + 'vvel')
+    with ProgressBar():
+        v_interpolated.store(vvel_store)
 
     return u_interpolated, v_interpolated
 
