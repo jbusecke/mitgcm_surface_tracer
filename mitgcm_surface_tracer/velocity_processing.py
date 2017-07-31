@@ -11,6 +11,11 @@ from dask.diagnostics import ProgressBar
 from aviso_products.aviso_processing import merge_aviso
 
 
+    # Test if time is continous
+    if np.any(ds.time.diff('time').data != ds.time.diff('time')[0].data):
+        raise RuntimeError('Time steps are not homogeneous. Likely missing \
+        files between the dt and nrt products')
+
 def interpolated_aviso_validmask(da, xi, yi):
     x = da.lon.data
     y = da.lat.data
@@ -23,6 +28,12 @@ def block_interpolate(array, x, y, xi, yi):
     a = interp_map_regular_grid(np.squeeze(array), x, y, xi, yi)
     return a[np.newaxis, :, :]
 
+def interpolated_aviso_validmask(da, xi, yi):
+    x = da.lon.data
+    y = da.lat.data
+    validmask_coarse = ~xr.ufuncs.isnan(da).all(dim='time').data.compute()
+    validmask_fine = interp_map_regular_grid(validmask_coarse, x, y, xi, yi)
+    return np.isclose(validmask_fine, 1.0)
 
 def process_aviso(odir,
                   ddir_dt,
@@ -145,13 +156,6 @@ def combine_validmask(data_dir, shape=None, debug=False):
     if debug:
         print('data_dir', data_dir)
         print(fnames)
-
-    if shape:
-        masks = np.array([readbin(f, shape) for f in fnames])
-    else:
-        raise RuntimeWarning('When shape is not given')
-
-    combo = np.all(np.stack(masks, axis=2), axis=2)
 
     fpath = data_dir+'/validmask_combined.bin'
     writebin(combo, fpath)

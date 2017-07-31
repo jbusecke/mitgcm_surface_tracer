@@ -174,6 +174,7 @@ def test_process_aviso(vel_dir):
     yc = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
     xg = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
     yg = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
+    
     odir = vel_dir.strpath
     ddir = vel_dir.strpath
 

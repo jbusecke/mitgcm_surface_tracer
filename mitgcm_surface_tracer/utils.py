@@ -18,7 +18,6 @@ def writetxt(string, filepath, verbose=False):
     f.close()
     print('--- Written to '+filepath+' ---')
 
-
 class writable_mds_store:
     '''adapted from @rabernat aviso processing notebooks'''
     def __init__(self, prefix, iters, suffix='data', dtype='>f4'):
