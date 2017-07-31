@@ -11,7 +11,7 @@ from dask.diagnostics import ProgressBar
 from aviso_products.aviso_processing import merge_aviso
 
 
-def interpolated_aviso_validmask(da, xi, yi):
+def aviso_validmask(da, xi, yi):
     x = da.lon.data
     y = da.lat.data
     validmask_coarse = ~xr.ufuncs.isnan(da).all(dim='time').data.compute()
@@ -24,87 +24,43 @@ def block_interpolate(array, x, y, xi, yi):
     return a[np.newaxis, :, :]
 
 
-def process_aviso(odir,
-                  ddir_dt,
-                  xc=None,
-                  xg=None,
-                  yc=None,
-                  yg=None,
-                  fid_dt='dt_global_allsat_msla_uv_*.nc',
-                  gdir=None,
-                  ddir_nrt=None,
-                  fid_nrt='nrt_global_allsat_msla_uv_*.nc',
-                  debug=True,
-                  verbose=True,
-                  mkdir=False):
+def interpolate_aviso(ds, XC, XG, YC, YG,
+                      debug=True, verbose=True, mkdir=False):
 
-    """read aviso files into xarray dataset, respecting 'seam' between
-    delayed-time
-    product and near-real time products
+    """Interpolate aviso dataset onto model coordinates (regular lat lon grid)
 
     PARAMETERS
     ----------
-    odir : path
-        output directory
-    gdir : path
-        grid directory for the interpolation target
-    ddir_dt : path
-        data directory for delayed time product
-    fid_dt : str
-        string pattern identifying delayed time products
-        (default:'dt_global_allsat_msla_uv_*.nc')
-    ddir_dt : path
-        data directory for near-real time product
-        (default: None)
-    fid_dt : str
-        string pattern identifying near-real time products
-        (default:nrt_global_allsat_msla_uv_*.nc')
+    ds : xarray Dataset from reading in Aviso data
+        (e.g. from aviso_products.merge_aviso)
+
+    XC : numpy.array Longitude at cell center (needs to be a vector)
+
+    XG : numpy.array Longitude at cell boundary
+
+    YC : numpy.array Latitude at cell center
+
+    YG : numpy.array Latitude at cell boundary
+
+    RETURNS
+    -------
+    ds_interpolated : xarray Dataset with interpolated values
+    validmask : indicates data points that were not interpolated
     """
-    if mkdir:
-        if not os.path.exists(odir):
-            os.mkdir(odir)
-
-    if gdir is None:
-        if any([x is None for x in [xg, yg, xc, yc]]):
-            raise RuntimeError('if grid dir is not specified all interpolation\
-            coordinates have to be supplied as input')
-        XC = xc
-        XG = xg
-        YC = yc
-        YG = yg
-    else:
-        if any([x is not None for x in [xg, yg, xc, yc]]):
-            raise RuntimeError('if grid dir is supplied, interpolation\
-             coordinates can not be specified')
-
-        grid = open_mdsdataset(gdir, iters=None)
-        XC = grid.XC.data
-        XG = grid.XG.data
-        YC = grid.YC.data
-        YG = grid.YG.data
-
-    ds, start_date, transition_date = merge_aviso(ddir_dt,
-                                                  fid_dt=fid_dt,
-                                                  ddir_nrt=ddir_nrt,
-                                                  fid_nrt=fid_nrt)
-    if verbose:
-        print('Startdate:'+str(start_date))
-    writetxt(str(start_date), odir+'/startdate.txt', verbose=verbose)
-
-    if verbose:
-        print('Near-real-time Transition:'+str(transition_date))
-    writetxt(str(transition_date), odir+'/transitiondate.txt', verbose=verbose)
+    # if mkdir:
+    #     if not os.path.exists(odir):
+    #         os.mkdir(odir)
 
     # create and save validmask
     # validmask indicates values that were interpolated or filled
     # and should be taken out for certain interpretations.
-    validmask_aviso_u = interpolated_aviso_validmask(ds.u, XG, YC)
-    validmask_aviso_v = interpolated_aviso_validmask(ds.v, XC, YG)
+    validmask_aviso_u = aviso_validmask(ds.u, XG, YC)
+    validmask_aviso_v = aviso_validmask(ds.v, XC, YG)
     validmask = np.logical_and(validmask_aviso_u, validmask_aviso_v)
 
-    if verbose:
-        print ('Validmask')
-    writebin(validmask, odir+'/validmask.bin', verbose=verbose)
+    # if verbose:
+    #     print ('Validmask')
+    # writebin(validmask, odir+'/validmask.bin', verbose=verbose)
 
     #  Velocities near the coast are padded with zeros and then interpolated
     ds = ds.fillna(0)
@@ -116,9 +72,29 @@ def process_aviso(odir,
                                           dtype=np.float64,
                                           chunks=(1, len(YC), len(XG)))
 
+    u_interpolated = xr.DataArray(u_interpolated,
+                                  dims=['lon', 'lat', 'time'],
+                                  coords={'lon': XG,
+                                          'lat': YC,
+                                          'time': ds.time})
+
     v_interpolated = ds.v.data.map_blocks(block_interpolate, x, y, XC, YG,
                                           dtype=np.float64,
                                           chunks=(1, len(YG), len(XC)))
+
+    v_interpolated = xr.DataArray(v_interpolated,
+                                  dims=['lon', 'lat', 'time'],
+                                  coords={'lon': XC,
+                                          'lat': YG,
+                                          'time': ds.time})
+
+    ds_interpolated = xr.Dataset({'u': u_interpolated,
+                                  'v': v_interpolated})
+
+    return ds_interpolated, validmask
+
+
+def aviso_store_daily(ds, odir, verbose=True):
     iters = range(len(ds.time.data))
     uvel_store = writable_mds_store(os.path.join(odir, 'uvelCorr'), iters)
     vvel_store = writable_mds_store(os.path.join(odir, 'vvelCorr'), iters)
@@ -126,33 +102,31 @@ def process_aviso(odir,
     if verbose:
         print('Writing interpolated u velocities to ' + odir + 'uvel')
     with ProgressBar():
-        u_interpolated.store(uvel_store)
+        ds.u.data.store(uvel_store)
 
     if verbose:
         print('Writing interpolated v velocities to ' + odir + 'vvel')
     with ProgressBar():
-        v_interpolated.store(vvel_store)
-
-    return u_interpolated, v_interpolated
+        ds.v.data.store(vvel_store)
 
 
-def combine_validmask(data_dir, shape=None, debug=False):
-    fnames = []
-    for dirpath, dirnames, filenames in os.walk(data_dir):
-        for filename in [f for f in filenames if f == 'validmask.bin']:
-            print('found validmask at '+os.path.join(dirpath, filename))
-            fnames.append(os.path.join(dirpath, filename))
-    if debug:
-        print('data_dir', data_dir)
-        print(fnames)
-
-    if shape:
-        masks = np.array([readbin(f, shape) for f in fnames])
-    else:
-        raise RuntimeWarning('When shape is not given')
-
-    combo = np.all(np.stack(masks, axis=2), axis=2)
-
-    fpath = data_dir+'/validmask_combined.bin'
-    writebin(combo, fpath)
-    print('--- combined validmask written to '+fpath+' ---')
+# def combine_validmask(data_dir, shape=None, debug=False):
+#     fnames = []
+#     for dirpath, dirnames, filenames in os.walk(data_dir):
+#         for filename in [f for f in filenames if f == 'validmask.bin']:
+#             print('found validmask at '+os.path.join(dirpath, filename))
+#             fnames.append(os.path.join(dirpath, filename))
+#     if debug:
+#         print('data_dir', data_dir)
+#         print(fnames)
+#
+#     if shape:
+#         masks = np.array([readbin(f, shape) for f in fnames])
+#     else:
+#         raise RuntimeWarning('When shape is not given')
+#
+#     combo = np.all(np.stack(masks, axis=2), axis=2)
+#
+#     fpath = data_dir+'/validmask_combined.bin'
+#     writebin(combo, fpath)
+#     print('--- combined validmask written to '+fpath+' ---')

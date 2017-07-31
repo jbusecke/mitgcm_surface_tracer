@@ -3,7 +3,7 @@ import pytest
 import xarray as xr
 import numpy as np
 from mitgcm_surface_tracer.velocity_processing import \
-    (interpolated_aviso_validmask, combine_validmask, process_aviso)
+    (aviso_validmask, interpolate_aviso)
 from mitgcm_surface_tracer.utils import writebin, readbin
 from numpy.testing import assert_allclose
 # from xarray.testing import assert_allclose as xr_assert_allclose
@@ -114,12 +114,12 @@ def vel_dir(tmpdir_factory):
     return vel_dir
 
 
-def test_interpolated_aviso_validmask(vel_dir):
+def test_aviso_validmask(vel_dir):
     ds = xr.open_mfdataset(str(vel_dir.join('dt_*.nc')))
     data = ds.u
     xi = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
     yi = np.linspace(data.lat.data.min(), data.lat.data.max(), 3)
-    mask = interpolated_aviso_validmask(data, xi, yi)
+    mask = aviso_validmask(data, xi, yi)
     mask_expected = np.array([
                              [False, False, True],
                              [False, False, True],
@@ -128,26 +128,17 @@ def test_interpolated_aviso_validmask(vel_dir):
     assert_allclose(mask_expected, mask)
 
 
-def test_process_aviso(vel_dir):
+def test_interpolate_aviso(vel_dir):
     ds = xr.open_mfdataset(str(vel_dir.join('dt_*.nc')))
+    ds = ds.sortby('time').chunk({'time': 1})
     data = ds.u
-    data = data.sortby('time').chunk([1, 2, 2])
     xc = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
     yc = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
     xg = np.linspace(data.lon.data.min(), data.lon.data.max(), 3)
     yg = np.linspace(data.lat.data.min(), data.lat.data.max(), 4)
 
-    odir = vel_dir.strpath
-    ddir = vel_dir.strpath
-
-    u, v = process_aviso(odir,
-                         ddir,
-                         xg=xg,
-                         xc=xc,
-                         yg=yg,
-                         yc=yc,
-                         fid_dt='dt_*.nc')
-
+    ds_int, validmask = interpolate_aviso(ds, XG=xg, XC=xc, YG=yg, YC=yc)
+    print(ds.isel(lat=1, lon=1).u)
     u_control = np.array([
         [[0., 1.5, 3.],
          [1., 2., 3.],
@@ -164,6 +155,7 @@ def test_process_aviso(vel_dir):
          [0.66666667,  0.83333333,  1.],
          [1., 1., 1.]]
         ])
+
     v_control = np.array([
         [[0., 1.5, 3.],
          [1., 2., 3.],
@@ -180,63 +172,50 @@ def test_process_aviso(vel_dir):
          [0.66666667,  0.83333333,  1.],
          [1., 1., 1.]]
         ])
-    # print(interpolated_control)
-    assert_allclose(u_control, u.compute())
+    print('pooo')
+    print(ds_int.u.shape)
+    print(u_control.shape)
+    print('pooo')
+    assert_allclose(u_control, ds_int.u.compute())
     # TODO:Not sure what I would expect here...need a lon wrapped dataset and
     # check if the values are
     # assert_allclose(v_control, v.compute())
 
-    with pytest.raises(RuntimeError) as excinfo:
-        process_aviso(vel_dir,
-                      vel_dir,
-                      gdir=vel_dir,
-                      xc=xc)
-        assert 'if grid dir is supplied,' in excinfo.value.message
 
-    with pytest.raises(RuntimeError) as excinfo:
-        process_aviso(vel_dir,
-                      vel_dir,
-                      gdir=None,
-                      xc=xc,
-                      yc=yc,
-                      xg=xg)
-        assert 'if grid dir is not specified' in excinfo.value.message
-
-
-def test_combine_validmask(tmpdir):
-    a = np.array([
-                 [True, True, True],
-                 [False, True, False]
-                 ])
-
-    b = np.array([
-                 [False, True, True],
-                 [True, False, False]
-                 ])
-
-    c = np.array([
-                 [False, True, True],
-                 [True, True, False]
-                 ])
-
-    combo = np.array([
-                     [False, True, True],
-                     [False, False, False]
-                     ])
-
-    file = tmpdir.mkdir('a').join('validmask.bin')
-    writebin(a, file.strpath)
-    file = tmpdir.mkdir('b').join('validmask.bin')
-    writebin(b, file.strpath)
-    file = tmpdir.mkdir('c').join('validmask.bin')
-    writebin(c, file.strpath)
-
-    dir = tmpdir.strpath
-
-    with pytest.raises(RuntimeWarning):
-        combine_validmask(dir, shape=None)
-
-    combine_validmask(dir, a.shape, debug=True)
-
-    test_file = tmpdir.join('validmask_combined.bin')
-    assert_allclose(combo, readbin(test_file.strpath, a.shape))
+# def test_combine_validmask(tmpdir):
+#     a = np.array([
+#                  [True, True, True],
+#                  [False, True, False]
+#                  ])
+#
+#     b = np.array([
+#                  [False, True, True],
+#                  [True, False, False]
+#                  ])
+#
+#     c = np.array([
+#                  [False, True, True],
+#                  [True, True, False]
+#                  ])
+#
+#     combo = np.array([
+#                      [False, True, True],
+#                      [False, False, False]
+#                      ])
+#
+#     file = tmpdir.mkdir('a').join('validmask.bin')
+#     writebin(a, file.strpath)
+#     file = tmpdir.mkdir('b').join('validmask.bin')
+#     writebin(b, file.strpath)
+#     file = tmpdir.mkdir('c').join('validmask.bin')
+#     writebin(c, file.strpath)
+#
+#     dir = tmpdir.strpath
+#
+#     with pytest.raises(RuntimeWarning):
+#         combine_validmask(dir, shape=None)
+#
+#     combine_validmask(dir, a.shape, debug=True)
+#
+#     test_file = tmpdir.join('validmask_combined.bin')
+#     assert_allclose(combo, readbin(test_file.strpath, a.shape))
