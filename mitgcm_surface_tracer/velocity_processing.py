@@ -4,11 +4,9 @@ import numpy as np
 # import time
 import os
 import os.path
-from xmitgcm import open_mdsdataset
 from xarrayutils.numpy_utils import interp_map_regular_grid
-from .utils import readbin, writebin, writetxt, writable_mds_store
+from .utils import writable_mds_store
 from dask.diagnostics import ProgressBar
-from aviso_products.aviso_processing import merge_aviso
 
 
 def aviso_validmask(da, xi, yi):
@@ -73,20 +71,22 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
                                           chunks=(1, len(YC), len(XG)))
 
     u_interpolated = xr.DataArray(u_interpolated,
-                                  dims=['lon', 'lat', 'time'],
-                                  coords={'lon': XG,
-                                          'lat': YC,
-                                          'time': ds.time})
+                                  dims=['time', 'lon', 'lat'],
+                                  coords={'time': ds.time,
+                                          'lon': XG,
+                                          'lat': YC
+                                          })
 
     v_interpolated = ds.v.data.map_blocks(block_interpolate, x, y, XC, YG,
                                           dtype=np.float64,
                                           chunks=(1, len(YG), len(XC)))
 
     v_interpolated = xr.DataArray(v_interpolated,
-                                  dims=['lon', 'lat', 'time'],
-                                  coords={'lon': XC,
-                                          'lat': YG,
-                                          'time': ds.time})
+                                  dims=['time', 'lon', 'lat'],
+                                  coords={'time': ds.time,
+                                          'lon': XG,
+                                          'lat': YC
+                                          })
 
     ds_interpolated = xr.Dataset({'u': u_interpolated,
                                   'v': v_interpolated})
