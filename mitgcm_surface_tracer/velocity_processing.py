@@ -63,24 +63,6 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
                                                     chunks=(1, ny, nx))
 
     return u_interpolated, v_interpolated
-    # u_interpolated = xr.DataArray(u_interpolated,
-    #                               dims=['time', 'lat', 'lon'],
-    #                               coords={'time': ds.time,
-    #                                       'lat': YC,
-    #                                       'lon': XG
-    #                                       })
-    #
-    # v_interpolated = xr.DataArray(v_interpolated,
-    #                               dims=['time', 'lat', 'lon'],
-    #                               coords={'time': ds.time,
-    #                                       'lat': YG,
-    #                                       'lon': XC
-    #                                       })
-    #
-    # ds_interpolated = xr.Dataset({'u': u_interpolated,
-    #                               'v': v_interpolated})
-    #
-    # return ds_interpolated
 
 
 def aviso_store_daily(ds, odir, verbose=True):
