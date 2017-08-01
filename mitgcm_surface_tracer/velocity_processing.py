@@ -60,7 +60,7 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
     v_interpolated = ds.v.fillna(0).data.map_blocks(block_interpolate, x, y,
                                                     XC, YG,
                                                     dtype=np.float64,
-                                                    chunks=(1, ny, nx)))
+                                                    chunks=(1, ny, nx))
 
     # u_interpolated = xr.DataArray(u_interpolated,
     #                               dims=['time', 'lat', 'lon'],
