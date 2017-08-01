@@ -65,20 +65,20 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
     return u_interpolated, v_interpolated
 
 
-def aviso_store_daily(ds, odir, verbose=True):
-    iters = range(len(ds.time.data))
+def aviso_store_daily(u, v, odir, verbose=True):
+    iters = range(u.shape[0])
     uvel_store = writable_mds_store(os.path.join(odir, 'uvelCorr'), iters)
     vvel_store = writable_mds_store(os.path.join(odir, 'vvelCorr'), iters)
 
     if verbose:
         print('Writing interpolated u velocities to ' + odir + 'uvel')
     with ProgressBar():
-        ds.u.data.store(uvel_store)
+        u.data.store(uvel_store)
 
     if verbose:
         print('Writing interpolated v velocities to ' + odir + 'vvel')
     with ProgressBar():
-        ds.v.data.store(vvel_store)
+        v.data.store(vvel_store)
 
 
 # def combine_validmask(data_dir, shape=None, debug=False):
