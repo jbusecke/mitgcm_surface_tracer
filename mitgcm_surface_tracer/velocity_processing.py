@@ -45,53 +45,42 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
     ds_interpolated : xarray Dataset with interpolated values
     validmask : indicates data points that were not interpolated
     """
-    # if mkdir:
-    #     if not os.path.exists(odir):
-    #         os.mkdir(odir)
-
-    # create and save validmask
-    # validmask indicates values that were interpolated or filled
-    # and should be taken out for certain interpretations.
-    validmask_aviso_u = aviso_validmask(ds.u, XG, YC)
-    validmask_aviso_v = aviso_validmask(ds.v, XC, YG)
-    validmask = np.logical_and(validmask_aviso_u, validmask_aviso_v)
-
-    # if verbose:
-    #     print ('Validmask')
-    # writebin(validmask, odir+'/validmask.bin', verbose=verbose)
-
-    #  Velocities near the coast are padded with zeros and then interpolated
-    ds = ds.fillna(0)
 
     x = ds.lon.data
     y = ds.lat.data
+    nx = len(XG)
+    ny = len(YC)
 
-    u_interpolated = ds.u.data.map_blocks(block_interpolate, x, y, XG, YC,
-                                          dtype=np.float64,
-                                          chunks=(1, len(YC), len(XG)))
+    #  Velocities near the coast are padded with zeros and then interpolated
+    u_interpolated = ds.u.fillna(0).data.map_blocks(block_interpolate, x, y,
+                                                    XG, YC,
+                                                    dtype=np.float64,
+                                                    chunks=(1, ny, nx))
 
-    u_interpolated = xr.DataArray(u_interpolated,
-                                  dims=['time', 'lat', 'lon'],
-                                  coords={'time': ds.time,
-                                          'lat': YC,
-                                          'lon': XG
-                                          })
+    v_interpolated = ds.v.fillna(0).data.map_blocks(block_interpolate, x, y,
+                                                    XC, YG,
+                                                    dtype=np.float64,
+                                                    chunks=(1, ny, nx)))
 
-    v_interpolated = ds.v.data.map_blocks(block_interpolate, x, y, XC, YG,
-                                          dtype=np.float64,
-                                          chunks=(1, len(YG), len(XC)))
-
-    v_interpolated = xr.DataArray(v_interpolated,
-                                  dims=['time', 'lat', 'lon'],
-                                  coords={'time': ds.time,
-                                          'lat': YG,
-                                          'lon': XC
-                                          })
-
-    ds_interpolated = xr.Dataset({'u': u_interpolated,
-                                  'v': v_interpolated})
-
-    return ds_interpolated, validmask
+    # u_interpolated = xr.DataArray(u_interpolated,
+    #                               dims=['time', 'lat', 'lon'],
+    #                               coords={'time': ds.time,
+    #                                       'lat': YC,
+    #                                       'lon': XG
+    #                                       })
+    #
+    # v_interpolated = xr.DataArray(v_interpolated,
+    #                               dims=['time', 'lat', 'lon'],
+    #                               coords={'time': ds.time,
+    #                                       'lat': YG,
+    #                                       'lon': XC
+    #                                       })
+    #
+    # ds_interpolated = xr.Dataset({'u': u_interpolated,
+    #                               'v': v_interpolated})
+    #
+    # return ds_interpolated
+    return u_interpolated, v_interpolated
 
 
 def aviso_store_daily(ds, odir, verbose=True):

@@ -4,7 +4,6 @@ import xarray as xr
 import numpy as np
 from mitgcm_surface_tracer.velocity_processing import \
     (aviso_validmask, interpolate_aviso)
-from mitgcm_surface_tracer.utils import writebin, readbin
 from numpy.testing import assert_allclose
 # from xarray.testing import assert_allclose as xr_assert_allclose
 import pandas as pd
