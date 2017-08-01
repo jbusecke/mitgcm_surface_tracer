@@ -73,12 +73,12 @@ def aviso_store_daily(u, v, odir, verbose=True):
     if verbose:
         print('Writing interpolated u velocities to ' + odir + 'uvel')
     with ProgressBar():
-        u.data.store(uvel_store)
+        u.store(uvel_store)
 
     if verbose:
         print('Writing interpolated v velocities to ' + odir + 'vvel')
     with ProgressBar():
-        v.data.store(vvel_store)
+        v.store(vvel_store)
 
 
 # def combine_validmask(data_dir, shape=None, debug=False):
