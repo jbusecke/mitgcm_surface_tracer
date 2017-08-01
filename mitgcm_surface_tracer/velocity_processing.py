@@ -23,7 +23,7 @@ def block_interpolate(array, x, y, xi, yi):
 
 
 def interpolate_aviso(ds, XC, XG, YC, YG,
-                      debug=True, verbose=True, mkdir=False):
+                      debug=True, verbose=True):
 
     """Interpolate aviso dataset onto model coordinates (regular lat lon grid)
 
@@ -66,17 +66,19 @@ def interpolate_aviso(ds, XC, XG, YC, YG,
 
 
 def aviso_store_daily(u, v, odir, verbose=True):
+    if not os.path.exists(odir):
+        os.mkdir(odir)
     iters = range(u.shape[0])
-    uvel_store = writable_mds_store(os.path.join(odir, 'uvelCorr'), iters)
-    vvel_store = writable_mds_store(os.path.join(odir, 'vvelCorr'), iters)
+    uvel_store = writable_mds_store(os.path.join(odir, 'uvel'), iters)
+    vvel_store = writable_mds_store(os.path.join(odir, 'vvel'), iters)
 
     if verbose:
-        print('Writing interpolated u velocities to ' + odir + 'uvel')
+        print('Writing interpolated u velocities to ' + odir)
     with ProgressBar():
         u.store(uvel_store)
 
     if verbose:
-        print('Writing interpolated v velocities to ' + odir + 'vvel')
+        print('Writing interpolated v velocities to ' + odir)
     with ProgressBar():
         v.store(vvel_store)
 
